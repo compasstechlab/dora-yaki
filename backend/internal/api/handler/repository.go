@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/compasstechlab/dora-yaki/internal/api/middleware"
@@ -330,9 +331,18 @@ func (h *RepositoryHandler) DateRanges(w http.ResponseWriter, r *http.Request) {
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if data != nil {
-		_ = json.NewEncoder(w).Encode(data)
+	if data == nil {
+		return
 	}
+
+	// Ensure nil slices are serialized as [] instead of null
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Slice && v.IsNil() {
+		_, _ = w.Write([]byte("[]\n"))
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 func getPathParam(r *http.Request, name string) string {
