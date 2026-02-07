@@ -9,13 +9,15 @@ import {
 } from '$api/client';
 
 // 期間プリセット
-export type PeriodPreset = 'week' | '2week' | 'month' | '3month';
+export type PeriodPreset = 'week' | '2week' | 'month' | '3month' | '6month' | 'year';
 
 export const PERIOD_OPTIONS: { key: PeriodPreset; days: number; labelKey: string }[] = [
 	{ key: 'week', days: 7, labelKey: 'period.week' },
 	{ key: '2week', days: 14, labelKey: 'period.2week' },
 	{ key: 'month', days: 30, labelKey: 'period.month' },
 	{ key: '3month', days: 90, labelKey: 'period.3month' },
+	{ key: '6month', days: 180, labelKey: 'period.6month' },
+	{ key: 'year', days: 365, labelKey: 'period.year' },
 ];
 
 export const selectedPeriod = writable<PeriodPreset>('month');

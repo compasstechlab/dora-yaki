@@ -403,6 +403,14 @@ let isRepoSelected = $derived(
 									{$t('repositories.syncAll', { range: 'month' })}
 									<span class="menu-hint">{$t('repositories.monthHint')}</span>
 								</button>
+								<button class="split-btn-menu-item" onclick={() => syncAllRepositories('6month')}>
+									{$t('repositories.syncAll', { range: '6month' })}
+									<span class="menu-hint">{$t('repositories.6monthHint')}</span>
+								</button>
+								<button class="split-btn-menu-item" onclick={() => syncAllRepositories('year')}>
+									{$t('repositories.syncAll', { range: 'year' })}
+									<span class="menu-hint">{$t('repositories.yearHint')}</span>
+								</button>
 								<button class="split-btn-menu-item" onclick={() => syncAllRepositories('full')}>
 									{$t('repositories.syncAll', { range: 'full' })}
 									<span class="menu-hint">{$t('repositories.fullHint')}</span>
@@ -496,6 +504,20 @@ let isRepoSelected = $derived(
 										>
 											{$t('repositories.monthSync')}
 											<span class="menu-hint">{$t('repositories.monthHint')}</span>
+										</button>
+										<button
+											class="split-btn-menu-item"
+											onclick={() => syncRepository(repo.id, '6month')}
+										>
+											{$t('repositories.6monthSync')}
+											<span class="menu-hint">{$t('repositories.6monthHint')}</span>
+										</button>
+										<button
+											class="split-btn-menu-item"
+											onclick={() => syncRepository(repo.id, 'year')}
+										>
+											{$t('repositories.yearSync')}
+											<span class="menu-hint">{$t('repositories.yearHint')}</span>
 										</button>
 										<button
 											class="split-btn-menu-item"
