@@ -75,7 +75,8 @@ func parseDateRange(r *http.Request) (time.Time, time.Time) {
 
 	if endStr != "" {
 		if t, err := timeutil.ParseDate(endStr); err == nil {
-			endDate = t
+			// Set to end of day so that records created on endDate are included
+			endDate = t.Add(24*time.Hour - time.Second)
 		}
 	}
 

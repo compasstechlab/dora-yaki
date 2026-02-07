@@ -25,11 +25,13 @@ function isActiveMember(stats: MemberStats): boolean {
 	);
 }
 
+let statsLoaded = $derived(Object.keys(memberStats).length >= members.length && members.length > 0);
+
 let visibleMembers = $derived(
 	members.filter((m) => {
 		if (!hideInactive) return true;
 		const stats = memberStats[m.id];
-		if (!stats) return false;
+		if (!stats) return !statsLoaded;
 		return isActiveMember(stats);
 	}),
 );
@@ -120,6 +122,11 @@ $effect(() => {
 						>({Object.keys(memberStats).length} / {members.length})</span
 					>
 				{/if}
+			</div>
+		{/if}
+		{#if statsLoaded && visibleMembers.length === 0 && hideInactive}
+			<div class="empty-state">
+				<p>{$t('team.noActiveMembers')}</p>
 			</div>
 		{/if}
 		<div class="team-grid">
