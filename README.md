@@ -197,6 +197,44 @@ dora-yaki/
 | `TZ_OFFSET` | Timezone offset (e.g. `+09:00`, `-05:30`). Defaults to UTC | No |
 | `VITE_API_BASE` | Backend API base path (frontend, default: `/api`) | No |
 
+### GitHub Token Setup
+
+DORA-yaki requires a GitHub Personal Access Token to fetch repository data, pull requests, reviews, and deployments.
+
+#### Option 1: Fine-grained Personal Access Token (Recommended)
+
+Fine-grained PATs provide more granular permission control and are recommended by GitHub.
+
+1. Go to [GitHub Settings > Developer settings > Fine-grained tokens](https://github.com/settings/personal-access-tokens/new)
+2. Set **Token name** and **Expiration**
+3. Under **Resource owner**, select the organization you want to access (e.g. `your-org`)
+   - If the organization is not listed, an org admin must enable fine-grained PAT access in [Organization settings > Personal access tokens](https://github.com/organizations/YOUR_ORG/settings/personal-access-tokens)
+4. Under **Repository access**, select **All repositories** or choose specific repositories
+5. Under **Permissions > Repository permissions**, grant the following:
+
+| Permission | Access | Purpose |
+|-----------|--------|---------|
+| **Metadata** | Read | List repositories |
+| **Contents** | Read | Read repository data |
+| **Pull requests** | Read | Fetch PR data for cycle time / review metrics |
+| **Deployments** | Read | Fetch deployment data for DORA deployment frequency |
+
+6. Click **Generate token** and copy it to `backend/.env`
+
+#### Option 2: Classic Personal Access Token
+
+1. Go to [GitHub Settings > Developer settings > Tokens (classic)](https://github.com/settings/tokens/new)
+2. Select the following scopes:
+
+| Scope | Purpose |
+|-------|---------|
+| `repo` | Full access to repositories (includes PRs, deployments) |
+| `read:org` | Read organization membership and repository listing |
+
+3. Click **Generate token** and copy it to `backend/.env`
+
+> **Note**: For organization repositories, the token owner must be a member of the organization. If using a fine-grained PAT, the organization admin must allow fine-grained PAT access.
+
 ## Infrastructure (Terraform)
 
 GCP resources are managed with Terraform (`terraform/` directory).
