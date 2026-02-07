@@ -68,6 +68,12 @@ func CollectOptionsForRange(syncRange string) *CollectOptions {
 	case "month":
 		opts.Since = now.AddDate(0, -1, 0)
 		opts.MaxPages = 10
+	case "6month":
+		opts.Since = now.AddDate(0, -6, 0)
+		opts.MaxPages = 20
+	case "year":
+		opts.Since = now.AddDate(-1, 0, 0)
+		opts.MaxPages = 30
 	default: // "full"
 		opts.Since = now.AddDate(0, -3, 0)
 		opts.MaxPages = 10

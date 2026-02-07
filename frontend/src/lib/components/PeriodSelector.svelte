@@ -37,7 +37,7 @@ import { PERIOD_OPTIONS, selectedPeriod, setPeriod } from '$stores/metrics';
 
 .period-buttons {
 	display: grid;
-	grid-template-columns: repeat(4, 1fr);
+	grid-template-columns: repeat(6, 1fr);
 	gap: 0.25rem;
 }
 
