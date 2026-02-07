@@ -107,7 +107,6 @@ Fine-grained PATs provide more granular permission control and are recommended b
 | Permission | Access | Purpose |
 |-----------|--------|---------|
 | **Metadata** | Read | List repositories |
-| **Contents** | Read | Read repository data |
 | **Pull requests** | Read | Fetch PR data for cycle time / review metrics |
 | **Deployments** | Read | Fetch deployment data for DORA deployment frequency |
 
