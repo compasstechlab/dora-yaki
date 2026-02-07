@@ -8,6 +8,7 @@ import {
 	type GitHubOrgRepo,
 	type SyncResponse,
 } from '$api/client';
+import { addFlash } from '$stores/flash';
 import { locale, t } from '$i18n';
 import { repositories, selectedRepositories } from '$stores/repositories';
 
@@ -199,6 +200,7 @@ async function syncAllRepositories(range: string = 'week') {
 }
 
 async function removeRepository(id: string) {
+	const repo = $repositories.find((r) => r.id === id);
 	if (!confirm($t('common.confirmDelete'))) return;
 
 	try {
@@ -207,8 +209,10 @@ async function removeRepository(id: string) {
 		if ($selectedRepositories.includes(id)) {
 			$selectedRepositories = $selectedRepositories.filter((r) => r !== id);
 		}
+		addFlash('success', $t('repositories.deleteSuccess', { name: repo?.fullName ?? id }));
 	} catch (e) {
 		console.error('Remove failed:', e);
+		addFlash('error', $t('repositories.deleteFailed', { name: repo?.fullName ?? id }));
 	}
 }
 

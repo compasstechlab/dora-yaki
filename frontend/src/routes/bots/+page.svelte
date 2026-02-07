@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { api, type BotUser, type CycleTimeMetrics, type ReviewMetrics } from '$api/client';
+import { addFlash } from '$stores/flash';
 import { browser } from '$app/environment';
 import { t } from '$i18n';
 import { dateRange, formatHours } from '$stores/metrics';
@@ -46,11 +47,15 @@ async function addBotUser() {
 }
 
 async function deleteBotUser(username: string) {
+	if (!confirm($t('bots.confirmDelete', { name: username }))) return;
+
 	try {
 		await api.botUsers.delete(username);
 		await loadBotUsers();
+		addFlash('success', $t('bots.deleteSuccess', { name: username }));
 	} catch (error) {
 		console.error('Failed to delete bot user:', error);
+		addFlash('error', $t('bots.deleteFailed', { name: username }));
 	}
 }
 
