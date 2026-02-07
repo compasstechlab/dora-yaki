@@ -6,37 +6,60 @@ GitHub のメトリクスを収集し、開発生産性を可視化・分析す�
 
 <img src="https://github.com/user-attachments/assets/3a7941d2-c18e-4742-b73f-8823351f7643" alt="DORA-yaki Top Page" width="800" >
 
+## スクリーンショット
+
+### ダッシュボード (トップページ)
+
+DORAメトリクス、サイクルタイム内訳、レビュー分析、生産性スコアを一覧表示。
+
+<img src="https://github.com/user-attachments/assets/3a7941d2-c18e-4742-b73f-8823351f7643" alt="DORA-yaki ダッシュボードページ" width="800" >
+
+### メトリクス
+
+日次トレンドチャート、PRサイズ分布、時系列分析などの詳細メトリクス。
+
+<img src="https://github.com/user-attachments/assets/3a7941d2-c18e-4742-b73f-8823351f7643" alt="DORA-yaki メトリクスページ" width="600" >
+
+### リポジトリ
+
+GitHubリポジトリの登録と、1日〜1年の柔軟な期間でのデータ同期。
+
+<img src="https://github.com/user-attachments/assets/711cd4e7-d0e8-45f6-a77c-e7e651b28d03" alt="DORA-yaki リポジトリページ" width="600" >
+
+### チームパフォーマンス
+
+メンバー別のPR数、レビュー活動、コード変更量を日次/週次ヒートマップチャートで表示。
+
+<img src="https://github.com/user-attachments/assets/bd20d343-9e5b-491e-b421-920726fb3463" alt="DORA-yaki チームパフォーマンスページ" width="600" >
+
+
+### メンバー詳細
+
+個人の貢献者ビュー。PR履歴、レビュー履歴、アクティビティタイムラインを表示。
+
+<img src="https://github.com/user-attachments/assets/911dfb62-a572-4676-80c0-c02bb2e48cc4" alt="DORA-yaki メンバー詳細ページ" width="600" >
+
+### リポジトリ詳細
+
+リポジトリ別のメトリクス内訳、PRリスト、サイクルタイムトレンド、コントリビューター統計。
+
+<img src="https://github.com/user-attachments/assets/bec28942-1d88-431a-96dd-41f44fa9dcf0" alt="DORA-yaki リポジトリ詳細ページ" width="600" >
+
+### ボット管理
+
+ボットアカウントの識別・管理。ボット専用のPR・レビューメトリクスを人間の活動と分離して表示。
+
+<img src="https://github.com/user-attachments/assets/839d6dc6-01ca-49b2-b822-85ec4764ad2f" alt="DORA-yaki ボット管理ページ" width="600" >
+
 ## 機能
 
-- **DORA メトリクス**
-  - デプロイ頻度
-  - 変更リードタイム
-  - 変更失敗率
-  - 平均復旧時間 (MTTR)
-
-- **サイクルタイム分析**
-  - コーディング / ピックアップ / レビュー / マージ の各工程
-  - 開発者別統計
-
-- **レビュー分析**
-  - レビュー数・コメント数
-  - レビュアー別統計
-  - 初回レビュー時間
-
-- **生産性スコア**
-  - 複合スコア (0-100)
-  - 改善提案
-
-- **チーム分析**
-  - メンバー別の日次/週次チャート
-  - PR・レビュー履歴
-
-- **ボットユーザー管理**
-  - ボットアカウントをメトリクスから除外
-
-- **多言語対応**
-  - 8言語: ja, en, zh-TW, zh-CN, ko, es, fr, de
-  - ブラウザ言語の自動検出、localStorage による永続化
+- **DORA メトリクス** — デプロイ頻度、変更リードタイム、変更失敗率、平均復旧時間 (MTTR)
+- **サイクルタイム分析** — コーディング / ピックアップ / レビュー / マージ の各工程と開発者別統計
+- **レビュー分析** — レビュー数・コメント数、レビュアー別統計、初回レビュー時間
+- **生産性スコア** — 複合スコア (0-100) と改善提案
+- **チーム分析** — メンバー別の日次/週次チャートとPR・レビュー履歴
+- **ボットユーザー管理** — ボットアカウントをメトリクスから除外、またはボット専用メトリクスを表示
+- **多言語対応** — 8言語 (ja, en, zh-TW, zh-CN, ko, es, fr, de)、ブラウザ言語自動検出対応
 
 ## 技術スタック
 
@@ -84,8 +107,7 @@ docker compose up
 ```
 
 4. アプリケーションにアクセス:
-- フロントエンド: http://localhost:7201
-- バックエンド API: http://localhost:7202
+- アプリケーション: http://localhost:7201
 
 ### 手動セットアップ
 
@@ -167,7 +189,8 @@ dora-yaki/
 │   │   ├── datastore/           # Cloud Datastore クライアント
 │   │   ├── domain/model/        # ドメインモデル
 │   │   ├── github/              # GitHub API クライアント & コレクター
-│   │   └── metrics/             # 計算 & 集約
+│   │   ├── metrics/             # 計算 & 集約
+│   │   └── timeutil/            # タイムゾーンオフセット処理
 │   ├── Dockerfile
 │   └── go.mod
 ├── frontend/
@@ -197,7 +220,10 @@ dora-yaki/
 | `PORT` | バックエンドのポート (デフォルト: 7202) | いいえ |
 | `ENVIRONMENT` | development / production | いいえ |
 | `TZ_OFFSET` | タイムゾーンオフセット (例: `+09:00`, `-05:30`)。未設定時は UTC | いいえ |
+| `FUNCTION_TARGET` | Cloud Functions エントリポイント (デフォルト: `RunHTTPServer`) | いいえ |
+| `API_BACKEND` | サーバーサイドプロキシのバックエンド API URL (デフォルト: `http://localhost:7202`) | いいえ |
 | `VITE_API_BASE` | バックエンド API のベースパス (フロントエンド、デフォルト: `/api`) | いいえ |
+| `VITE_DEFAULT_LOCALE` | デフォルト言語 (デフォルト: `ja`) | いいえ |
 
 ### GitHub トークンの設定
 
