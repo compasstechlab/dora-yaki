@@ -3,25 +3,27 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "7202:7202"
     environment:
       - PORT=7202
       - ENVIRONMENT=development
+      - FUNCTION_TARGET=RunHTTPServer
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
     volumes:
-      # ローカル開発環境専用: ホストのgcloud認証情報をマウント
-      # 本番環境ではサービスアカウントを使用すること
+      # Local dev only: mount host gcloud credentials
+      # Use service account in production
       - ~/.config/gcloud:/root/.config/gcloud:ro
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # args:
+      #   /* to avoid CORS error, use API_BACKEND instead of VITE_API_BASE */
+      #   - VITE_API_BASE=http://localhost:7202/api
     ports:
       - "7201:7201"
     environment:
-      - VITE_API_BASE=http://localhost:7202
+      - API_BACKEND=http://backend:7202
     depends_on:
       - backend
