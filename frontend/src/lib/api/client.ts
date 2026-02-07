@@ -41,6 +41,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 		throw new Error(msg);
 	}
 
+	// Skip JSON parsing for empty responses (e.g. 204 No Content)
+	if (response.status === 204 || response.headers.get('content-length') === '0') {
+		return undefined as T;
+	}
+
 	return response.json();
 }
 

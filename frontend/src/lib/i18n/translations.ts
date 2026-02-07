@@ -277,6 +277,9 @@ const ja: TranslationDict = {
 		reviewCount: 'レビュー数',
 		commentCount: 'コメント数',
 		approvalRate: '承認率',
+		confirmDelete: '@{name} を削除しますか？',
+		deleteSuccess: '@{name} を削除しました',
+		deleteFailed: '@{name} の削除に失敗しました',
 	},
 	repositories: {
 		pageTitle: 'リポジトリ | DORA-yaki',
@@ -323,6 +326,8 @@ const ja: TranslationDict = {
 			deployments: 'デプロイ: {count}件',
 			members: 'メンバー: {count}人',
 		},
+		deleteSuccess: '{name} を削除しました',
+		deleteFailed: '{name} の削除に失敗しました',
 	},
 	deployFrequency: {
 		daily: 'Elite (毎日)',
@@ -648,6 +653,9 @@ const en: TranslationDict = {
 		reviewCount: 'Reviews',
 		commentCount: 'Comments',
 		approvalRate: 'Approval Rate',
+		confirmDelete: 'Delete @{name}?',
+		deleteSuccess: '@{name} deleted',
+		deleteFailed: 'Failed to delete @{name}',
 	},
 	repositories: {
 		pageTitle: 'Repositories | DORA-yaki',
@@ -694,6 +702,8 @@ const en: TranslationDict = {
 			deployments: 'Deployments: {count}',
 			members: 'Members: {count}',
 		},
+		deleteSuccess: '{name} deleted',
+		deleteFailed: 'Failed to delete {name}',
 	},
 	deployFrequency: {
 		daily: 'Elite (Daily)',
@@ -1018,6 +1028,9 @@ const zhTW: TranslationDict = {
 		reviewCount: '審查數',
 		commentCount: '評論數',
 		approvalRate: '核准率',
+		confirmDelete: '確定要刪除 @{name} 嗎？',
+		deleteSuccess: '已刪除 @{name}',
+		deleteFailed: '刪除 @{name} 失敗',
 	},
 	repositories: {
 		pageTitle: '儲存庫 | DORA-yaki',
@@ -1064,6 +1077,8 @@ const zhTW: TranslationDict = {
 			deployments: '部署: {count}',
 			members: '成員: {count}',
 		},
+		deleteSuccess: '已刪除 {name}',
+		deleteFailed: '刪除 {name} 失敗',
 	},
 	deployFrequency: {
 		daily: 'Elite（每天）',
@@ -1386,6 +1401,9 @@ const zhCN: TranslationDict = {
 		reviewCount: '审查数',
 		commentCount: '评论数',
 		approvalRate: '批准率',
+		confirmDelete: '确定要删除 @{name} 吗？',
+		deleteSuccess: '已删除 @{name}',
+		deleteFailed: '删除 @{name} 失败',
 	},
 	repositories: {
 		pageTitle: '仓库 | DORA-yaki',
@@ -1432,6 +1450,8 @@ const zhCN: TranslationDict = {
 			deployments: '部署: {count}',
 			members: '成员: {count}',
 		},
+		deleteSuccess: '已删除 {name}',
+		deleteFailed: '删除 {name} 失败',
 	},
 	deployFrequency: {
 		daily: 'Elite（每天）',
@@ -1755,6 +1775,9 @@ const ko: TranslationDict = {
 		reviewCount: '리뷰 수',
 		commentCount: '댓글 수',
 		approvalRate: '승인율',
+		confirmDelete: '@{name}을(를) 삭제하시겠습니까?',
+		deleteSuccess: '@{name} 삭제됨',
+		deleteFailed: '@{name} 삭제 실패',
 	},
 	repositories: {
 		pageTitle: '저장소 | DORA-yaki',
@@ -1801,6 +1824,8 @@ const ko: TranslationDict = {
 			deployments: '배포: {count}건',
 			members: '멤버: {count}명',
 		},
+		deleteSuccess: '{name} 삭제됨',
+		deleteFailed: '{name} 삭제 실패',
 	},
 	deployFrequency: {
 		daily: 'Elite (매일)',
@@ -1933,6 +1958,9 @@ const es: TranslationDict = {
 		reviewCountCol: 'Revisiones',
 		commentCount: 'Comentarios',
 		approvalRate: 'Tasa de Aprobación',
+		confirmDelete: '¿Eliminar @{name}?',
+		deleteSuccess: '@{name} eliminado',
+		deleteFailed: 'Error al eliminar @{name}',
 	},
 	metrics: {
 		pageTitle: 'Análisis de Métricas | DORA-yaki',
@@ -2171,6 +2199,8 @@ const es: TranslationDict = {
 			deployments: 'Despliegues: {count}',
 			members: 'Miembros: {count}',
 		},
+		deleteSuccess: '{name} eliminado',
+		deleteFailed: 'Error al eliminar {name}',
 	},
 	deployFrequency: {
 		daily: 'Elite (Diario)',
@@ -2494,6 +2524,9 @@ const fr: TranslationDict = {
 		reviewCount: 'Revues',
 		commentCount: 'Commentaires',
 		approvalRate: "Taux d'approbation",
+		confirmDelete: 'Supprimer @{name} ?',
+		deleteSuccess: '@{name} supprimé',
+		deleteFailed: 'Échec de la suppression de @{name}',
 	},
 	repositories: {
 		pageTitle: 'Dépôts | DORA-yaki',
@@ -2540,6 +2573,8 @@ const fr: TranslationDict = {
 			deployments: 'Déploiements: {count}',
 			members: 'Membres: {count}',
 		},
+		deleteSuccess: '{name} supprimé',
+		deleteFailed: 'Échec de la suppression de {name}',
 	},
 	deployFrequency: {
 		daily: 'Elite (Quotidien)',
@@ -2672,6 +2707,9 @@ const de: TranslationDict = {
 		reviewCountCol: 'Reviews',
 		commentCount: 'Kommentare',
 		approvalRate: 'Genehmigungsrate',
+		confirmDelete: '@{name} löschen?',
+		deleteSuccess: '@{name} gelöscht',
+		deleteFailed: 'Fehler beim Löschen von @{name}',
 	},
 	metrics: {
 		pageTitle: 'Metrikenanalyse | DORA-yaki',
@@ -2910,6 +2948,8 @@ const de: TranslationDict = {
 			deployments: 'Deployments: {count}',
 			members: 'Mitglieder: {count}',
 		},
+		deleteSuccess: '{name} gelöscht',
+		deleteFailed: 'Fehler beim Löschen von {name}',
 	},
 	deployFrequency: {
 		daily: 'Elite (Täglich)',
