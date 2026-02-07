@@ -4,6 +4,8 @@ A dashboard application that collects GitHub metrics and visualizes development 
 
 > **日本語版**: [README.ja.md](./README.ja.md)
 
+<img src="https://github.com/user-attachments/assets/3a7941d2-c18e-4742-b73f-8823351f7643" alt="DORA-yaki Top Page" width="800" >
+
 ## Features
 
 - **DORA Metrics**

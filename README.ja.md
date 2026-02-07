@@ -4,6 +4,8 @@ GitHub のメトリクスを収集し、開発生産性を可視化・分析す�
 
 > **English version**: [README.md](./README.md)
 
+<img src="https://github.com/user-attachments/assets/3a7941d2-c18e-4742-b73f-8823351f7643" alt="DORA-yaki Top Page" width="800" >
+
 ## 機能
 
 - **DORA メトリクス**
