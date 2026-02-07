@@ -107,7 +107,6 @@ Fine-grained PAT はより細かい権限制御が可能で、GitHub が推奨�
 | 権限 | アクセスレベル | 用途 |
 |------|-------------|------|
 | **Metadata** | Read | リポジトリ一覧の取得 |
-| **Contents** | Read | リポジトリデータの読み取り |
 | **Pull requests** | Read | サイクルタイム・レビューメトリクス用の PR データ取得 |
 | **Deployments** | Read | DORA デプロイ頻度用のデプロイメントデータ取得 |
 
