@@ -197,6 +197,44 @@ dora-yaki/
 | `TZ_OFFSET` | タイムゾーンオフセット (例: `+09:00`, `-05:30`)。未設定時は UTC | いいえ |
 | `VITE_API_BASE` | バックエンド API のベースパス (フロントエンド、デフォルト: `/api`) | いいえ |
 
+### GitHub トークンの設定
+
+DORA-yaki はリポジトリデータ、プルリクエスト、レビュー、デプロイメントを取得するために GitHub Personal Access Token が必要です。
+
+#### 方法 1: Fine-grained Personal Access Token (推奨)
+
+Fine-grained PAT はより細かい権限制御が可能で、GitHub が推奨する方式です。
+
+1. [GitHub Settings > Developer settings > Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) にアクセス
+2. **Token name** と **Expiration** を設定
+3. **Resource owner** でアクセスしたいOrganizationを選択 (例: `your-org`)
+   - Organizationが一覧に表示されない場合、org 管理者が [Organization settings > Personal access tokens](https://github.com/organizations/YOUR_ORG/settings/personal-access-tokens) で Fine-grained PAT のアクセスを許可する必要があります
+4. **Repository access** で **All repositories** を選択、または特定のリポジトリを選択
+5. **Permissions > Repository permissions** で以下の権限を付与:
+
+| 権限 | アクセスレベル | 用途 |
+|------|-------------|------|
+| **Metadata** | Read | リポジトリ一覧の取得 |
+| **Contents** | Read | リポジトリデータの読み取り |
+| **Pull requests** | Read | サイクルタイム・レビューメトリクス用のPRデータ取得 |
+| **Deployments** | Read | DORAデプロイ頻度用のデプロイメントデータ取得 |
+
+6. **Generate token** をクリックしてトークンを `backend/.env` にコピー
+
+#### 方法 2: Classic Personal Access Token
+
+1. [GitHub Settings > Developer settings > Tokens (classic)](https://github.com/settings/tokens/new) にアクセス
+2. 以下のスコープを選択:
+
+| スコープ | 用途 |
+|---------|------|
+| `repo` | リポジトリへのフルアクセス (PR、デプロイメント含む) |
+| `read:org` | Organizationのメンバーシップ・リポジトリ一覧の読み取り |
+
+3. **Generate token** をクリックしてトークンを `backend/.env` にコピー
+
+> **注意**: Organizationのリポジトリにアクセスする場合、トークンの所有者がそのOrganizationのメンバーである必要があります。Fine-grained PAT を使用する場合、Organization 管理者が Fine-grained PAT のアクセスを許可している必要があります。
+
 ## インフラ (Terraform)
 
 GCP リソースは Terraform (`terraform/` ディレクトリ) で管理しています。

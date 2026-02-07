@@ -18,7 +18,7 @@ async function fetchDateRanges() {
 	try {
 		const ranges = await api.repositories.dateRanges();
 		const map: Record<string, DataDateRange> = {};
-		for (const r of ranges) {
+		for (const r of ranges ?? []) {
 			map[r.repositoryId] = r;
 		}
 		dateRanges = map;
@@ -38,6 +38,7 @@ let repoType = $state('');
 // Build ownerName from selection
 let ownerName = $derived(selectedOwner === '__custom__' ? customOwner : selectedOwner);
 let ownerRepos = $state<GitHubOrgRepo[]>([]);
+let hasSearched = $state(false);
 let isLoadingOwner = $state(false);
 let searchError = $state('');
 let selectedRepos = $state<Set<string>>(new Set());
@@ -86,11 +87,13 @@ async function fetchOwnerRepos() {
 	isLoadingOwner = true;
 	searchError = '';
 	ownerRepos = [];
+	hasSearched = false;
 	selectedRepos = new Set();
 	batchResults = [];
 
 	try {
-		ownerRepos = await api.github.listOwnerRepos(ownerName, repoType || undefined);
+		ownerRepos = await api.github.listOwnerRepos(ownerName, repoType || undefined) ?? [];
+		hasSearched = true;
 	} catch (e) {
 		searchError = e instanceof Error ? e.message : $t('repositories.fetchFailed');
 	} finally {
@@ -271,6 +274,10 @@ let isRepoSelected = $derived(
 					<p class="error">{searchError}</p>
 				{/if}
 			</form>
+
+			{#if hasSearched && ownerRepos.length === 0 && !searchError}
+				<p class="empty-message">{$t('repositories.noSearchResults', { owner: ownerName })}</p>
+			{/if}
 
 			{#if ownerRepos.length > 0}
 				<div class="search-results">
@@ -621,6 +628,12 @@ let isRepoSelected = $derived(
 .error {
 	color: var(--color-danger);
 	font-size: 0.875rem;
+}
+
+.empty-message {
+	color: var(--color-text-muted, #6b7280);
+	font-size: 0.875rem;
+	margin-top: 1rem;
 }
 
 /* Search Results */

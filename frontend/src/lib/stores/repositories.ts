@@ -15,7 +15,7 @@ function createRepositoriesStore() {
 		load: async () => {
 			try {
 				const repos = await api.repositories.list();
-				set(sortByName(repos));
+				set(sortByName(repos ?? []));
 			} catch (error) {
 				console.error('Failed to load repositories:', error);
 				throw error;
