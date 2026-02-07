@@ -1,19 +1,4 @@
 services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    environment:
-      - PORT=7202
-      - ENVIRONMENT=development
-      - FUNCTION_TARGET=RunHTTPServer
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-    volumes:
-      # Local dev only: mount host gcloud credentials
-      # Use service account in production
-      - ~/.config/gcloud:/root/.config/gcloud:ro
-
   frontend:
     build:
       context: ./frontend
@@ -27,3 +12,42 @@ services:
       - API_BACKEND=http://backend:7202
     depends_on:
       - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - PORT=7202
+      - ENVIRONMENT=development
+      - FUNCTION_TARGET=RunHTTPServer
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-local-dev}
+      - DATASTORE_EMULATOR_HOST=datastore-emulator:8081
+    depends_on:
+      - datastore-emulator
+
+  # Datastore emulator (remove `--no-store-on-disk` to persist data)
+  datastore-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: >
+      gcloud beta emulators datastore start
+      --project=${GCP_PROJECT_ID:-local-dev}
+      --host-port=0.0.0.0:8081
+      --no-store-on-disk
+
+  # /* if you want to use real Datastore on GCP instead of emulator, use this */
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  # environment:
+  #   - PORT=7202
+  #   - ENVIRONMENT=development
+  #   - FUNCTION_TARGET=RunHTTPServer
+  #   - GITHUB_TOKEN=${GITHUB_TOKEN}
+  #   - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+  # volumes:
+  #   # Local dev only: mount host gcloud credentials (Use service account in production)
+  #   # `gcloud auth application-default login` to login before running `docker compose up`
+  #   - ~/.config/gcloud:/root/.config/gcloud:ro
