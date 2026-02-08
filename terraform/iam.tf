@@ -21,7 +21,12 @@ resource "google_secret_manager_secret" "github_token" {
   secret_id = "GITHUB_TOKEN"
 
   replication {
-    auto {}
+    # auto {}
+    user_managed {
+      replicas {
+        location = "asia-northeast1"
+      }
+    }
   }
 
   depends_on = [google_project_service.secretmanager]
