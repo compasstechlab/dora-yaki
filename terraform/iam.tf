@@ -22,6 +22,12 @@ resource "google_secret_manager_secret" "github_token" {
 
   replication {
     auto {}
+    // if you want to use specified locations, use user_managed instead
+    # user_managed {
+    #   replicas {
+    #     location = "asia-northeast1"
+    #   }
+    # }
   }
 
   depends_on = [google_project_service.secretmanager]

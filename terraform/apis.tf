@@ -39,3 +39,11 @@ resource "google_project_service" "secretmanager" {
 
   disable_on_destroy = false
 }
+
+# Cloud Firestore API
+resource "google_project_service" "firestore" {
+  project = var.project_id
+  service = "firestore.googleapis.com"
+
+  disable_on_destroy = false
+}

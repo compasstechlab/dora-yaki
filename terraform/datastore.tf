@@ -1,11 +1,21 @@
+# Firestore database (Datastore Mode)
+resource "google_firestore_database" "default" {
+  project     = var.project_id
+  name        = "(default)"
+  location_id = var.region
+  type        = "DATASTORE_MODE"
+
+  depends_on = [google_firestore_database.default]
+}
+
 # Datastore composite index definitions
 # Managed via google_firestore_index (Firestore in Datastore Mode)
 
 # PullRequest: filter by repository_id + sort by created_at DESC
 resource "google_firestore_index" "pull_request_repo_created" {
-  project    = var.project_id
-  database   = "(default)"
-  collection = "PullRequest"
+  project     = var.project_id
+  database    = "(default)"
+  collection  = "PullRequest"
   query_scope = "COLLECTION_GROUP"
   api_scope   = "DATASTORE_MODE_API"
 
@@ -18,13 +28,15 @@ resource "google_firestore_index" "pull_request_repo_created" {
     field_path = "created_at"
     order      = "DESCENDING"
   }
+
+  depends_on = [google_firestore_database.default]
 }
 
 # Review: filter by repository_id + sort by submitted_at DESC
 resource "google_firestore_index" "review_repo_submitted" {
-  project    = var.project_id
-  database   = "(default)"
-  collection = "Review"
+  project     = var.project_id
+  database    = "(default)"
+  collection  = "Review"
   query_scope = "COLLECTION_GROUP"
   api_scope   = "DATASTORE_MODE_API"
 
@@ -37,13 +49,15 @@ resource "google_firestore_index" "review_repo_submitted" {
     field_path = "submitted_at"
     order      = "DESCENDING"
   }
+
+  depends_on = [google_firestore_database.default]
 }
 
 # Deployment: filter by repository_id + sort by created_at DESC
 resource "google_firestore_index" "deployment_repo_created" {
-  project    = var.project_id
-  database   = "(default)"
-  collection = "Deployment"
+  project     = var.project_id
+  database    = "(default)"
+  collection  = "Deployment"
   query_scope = "COLLECTION_GROUP"
   api_scope   = "DATASTORE_MODE_API"
 
@@ -56,13 +70,15 @@ resource "google_firestore_index" "deployment_repo_created" {
     field_path = "created_at"
     order      = "DESCENDING"
   }
+
+  depends_on = [google_firestore_database.default]
 }
 
 # DailyMetrics: filter by repository_id + sort by date ASC
 resource "google_firestore_index" "daily_metrics_repo_date" {
-  project    = var.project_id
-  database   = "(default)"
-  collection = "DailyMetrics"
+  project     = var.project_id
+  database    = "(default)"
+  collection  = "DailyMetrics"
   query_scope = "COLLECTION_GROUP"
   api_scope   = "DATASTORE_MODE_API"
 
@@ -75,13 +91,15 @@ resource "google_firestore_index" "daily_metrics_repo_date" {
     field_path = "date"
     order      = "ASCENDING"
   }
+
+  depends_on = [google_firestore_database.default]
 }
 
 # Sprint: filter by repository_id + sort by start_date DESC
 resource "google_firestore_index" "sprint_repo_start_date" {
-  project    = var.project_id
-  database   = "(default)"
-  collection = "Sprint"
+  project     = var.project_id
+  database    = "(default)"
+  collection  = "Sprint"
   query_scope = "COLLECTION_GROUP"
   api_scope   = "DATASTORE_MODE_API"
 
@@ -94,4 +112,6 @@ resource "google_firestore_index" "sprint_repo_start_date" {
     field_path = "start_date"
     order      = "DESCENDING"
   }
+
+  depends_on = [google_firestore_database.default]
 }
