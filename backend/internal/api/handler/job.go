@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 
@@ -26,7 +27,6 @@ const (
 )
 
 // JobHandler handles batch job API requests.
-// バッチジョブ系APIを処理する。
 type JobHandler struct {
 	ds        *datastore.Client
 	gh        *github.Client
@@ -49,7 +49,6 @@ func NewJobHandler(ds *datastore.Client, gh *github.Client, logger *slog.Logger,
 }
 
 // jobSyncRequest is a request parsed from both query parameters and JSON body.
-// クエリパラメータと JSON body 両方から読み取るリクエスト。
 type jobSyncRequest struct {
 	Range      string `json:"range"`
 	Interval   int    `json:"interval"`    // Sync interval in minutes (0 = use config value)
@@ -60,7 +59,6 @@ type jobSyncRequest struct {
 }
 
 // JobSyncResponse is the sync job response.
-// 同期ジョブのレスポンス。
 type JobSyncResponse struct {
 	Status       string           `json:"status"`
 	Message      string           `json:"message"`
@@ -74,7 +72,6 @@ type JobSyncResponse struct {
 }
 
 // RepoSyncResult represents the sync result for an individual repository.
-// 個別リポジトリの同期結果。
 type RepoSyncResult struct {
 	RepositoryID string `json:"repositoryId"`
 	FullName     string `json:"fullName"`
@@ -136,7 +133,7 @@ func parseSyncRequest(r *http.Request) jobSyncRequest {
 }
 
 // Sync synchronizes a single repository that matches the criteria.
-// Cloud Scheduler からの定期実行を想定。
+// Designed to be invoked periodically by Cloud Scheduler.
 func (h *JobHandler) Sync(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	startedAt := time.Now()
@@ -297,17 +294,22 @@ func (h *JobHandler) pickSyncTarget(repos []*model.Repository, req jobSyncReques
 		return nil
 	}
 
-	// No repo specified: select the oldest eligible repository
-	var target *model.Repository
-	var oldestSync time.Time
+	// No repo specified: sort by LastSyncedAt ascending, then pick the first eligible one
+	sort.Slice(repos, func(i, j int) bool {
+		ti, tj := time.Time{}, time.Time{}
+		if repos[i].LastSyncedAt != nil {
+			ti = *repos[i].LastSyncedAt
+		}
+		if repos[j].LastSyncedAt != nil {
+			tj = *repos[j].LastSyncedAt
+		}
+		return ti.Before(tj)
+	})
 
 	for _, repo := range repos {
-		// Check interval
 		if repo.LastSyncedAt != nil && now.Sub(*repo.LastSyncedAt) < syncInterval {
 			continue
 		}
-
-		// ProcessStartAt check: skip if less than 10min elapsed
 		if repo.ProcessStartAt != nil && now.Sub(*repo.ProcessStartAt) < processStartGuard {
 			h.logger.Info("skipping repository: process recently started",
 				"repository", repo.FullName,
@@ -315,20 +317,10 @@ func (h *JobHandler) pickSyncTarget(repos []*model.Repository, req jobSyncReques
 			)
 			continue
 		}
-
-		// Select repository with the oldest LastSyncedAt
-		repoSync := time.Time{} // zero value = never synced = highest priority
-		if repo.LastSyncedAt != nil {
-			repoSync = *repo.LastSyncedAt
-		}
-
-		if target == nil || repoSync.Before(oldestSync) {
-			target = repo
-			oldestSync = repoSync
-		}
+		return repo
 	}
 
-	return target
+	return nil
 }
 
 // matchRepoName checks if the repository matches the given name.
@@ -338,7 +330,6 @@ func matchRepoName(repo *model.Repository, name string) bool {
 }
 
 // syncSingleRepo executes sync for a single repository.
-// 単一リポジトリの同期を実行する。
 func (h *JobHandler) syncSingleRepo(ctx context.Context, repo *model.Repository, syncRange string) RepoSyncResult {
 	result := RepoSyncResult{
 		RepositoryID: repo.ID,
