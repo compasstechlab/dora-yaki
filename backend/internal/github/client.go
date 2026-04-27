@@ -200,8 +200,10 @@ func (c *Client) ListContributors(ctx context.Context, owner, repo string) ([]*m
 
 // GitHubUser represents authenticated user information.
 type GitHubUser struct {
+	ID        int64    `json:"id"`
 	Login     string   `json:"login"`
 	Name      string   `json:"name"`
+	Email     string   `json:"email"`
 	AvatarURL string   `json:"avatarUrl"`
 	Orgs      []string `json:"orgs"`
 }
@@ -214,8 +216,10 @@ func (c *Client) GetAuthenticatedUser(ctx context.Context) (*GitHubUser, error) 
 	}
 
 	result := &GitHubUser{
+		ID:        user.GetID(),
 		Login:     user.GetLogin(),
 		Name:      user.GetName(),
+		Email:     user.GetEmail(),
 		AvatarURL: user.GetAvatarURL(),
 	}
 

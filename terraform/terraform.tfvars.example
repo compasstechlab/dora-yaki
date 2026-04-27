@@ -1,2 +1,40 @@
 project_id = "your-gcp-project-id"
 region     = "asia-northeast1"
+
+# Resource names. Change these when deploying your own fork or multiple
+# environments into the same GCP project.
+# resource_name_prefix          = "my-dora-yaki"
+# service_account_id           = "my-dora-yaki-api"
+# service_account_display_name = "My DORA-Yaki API"
+
+# Secret Manager replication. Leave empty for automatic replication.
+# secret_replication_locations = ["asia-northeast1"]
+
+# Datastore. Set create_datastore_database = false if the project already has
+# a default Firestore database. Leave datastore_location_id empty to use region.
+# create_datastore_database = true
+# datastore_location_id       = "asia-northeast1"
+
+# Set after the Cloud Run / Cloud Functions service URL is known so
+# Cloud Scheduler jobs can be created. Leave blank on first apply.
+# backend_service_url = "https://dora-yaki-api-xxxxx-an.a.run.app"
+# Shared key for Cloud Scheduler job endpoints. Generate with:
+#   openssl rand -base64 32
+# Must match the JOB_AUTH_KEY secret value used by the backend.
+# Note: Terraform will store this value in state.
+# scheduler_auth_key = "replace-with-generated-secret"
+
+# Token-at-rest encryption strategy.
+#   - use_kms = false (default): rely on ENCRYPTION_KEY_BASE64 stored in Secret Manager.
+#   - use_kms = true: provision a Cloud KMS key; configure ENCRYPTION_KMS_KEY at runtime instead.
+# use_kms             = false
+# kms_location        = "asia-northeast1"
+# kms_key_ring_name   = "my-dora-yaki"
+# kms_crypto_key_name = "tokens"
+
+# Cron schedules (override defaults if needed).
+# sync_job_name                = "my-dora-yaki-sync"
+# sync_schedule                = "*/15 * * * *"
+# permission_check_job_name    = "my-dora-yaki-permission-check"
+# permission_check_schedule    = "0 3 * * *"
+# scheduler_time_zone          = "Asia/Tokyo"

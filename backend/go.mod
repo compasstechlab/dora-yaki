@@ -5,8 +5,14 @@ go 1.25.0
 require (
 	cloud.google.com/go/compute/metadata v0.8.0
 	cloud.google.com/go/datastore v1.21.0
+	cloud.google.com/go/kms v1.22.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.9.2
 	golang.org/x/oauth2 v0.34.0
+)
+
+require (
+	cloud.google.com/go/iam v1.5.2 // indirect
+	cloud.google.com/go/longrunning v0.6.7 // indirect
 )
 
 require (

@@ -58,6 +58,7 @@ GitHubリポジトリの登録と、1日〜1年の柔軟な期間でのデータ
 - **チーム分析** — メンバー別の日次/週次チャートとPR・レビュー履歴
 - **ボットユーザー管理** — ボットアカウントをメトリクスから除外、またはボット専用メトリクスを表示
 - **多言語対応** — 8言語 (ja, en, zh-TW, zh-CN, ko, es, fr, de)、ブラウザ言語自動検出対応
+- **GitHub OAuth ログイン** — ユーザー毎の認証。OAuth トークンは Datastore に AES-256-GCM (または Cloud KMS) で暗号化保存、リポジトリ毎の ACL は日次で更新
 
 ## 技術スタック
 
@@ -76,7 +77,7 @@ GitHubリポジトリの登録と、1日〜1年の柔軟な期間でのデータ
 ### 前提条件
 
 - Docker & Docker Compose
-- GitHub Personal Access Token ([設定ガイド](./docs/DEPLOYMENT.ja.md#github-トークンの設定))
+- GitHub OAuth App ([設定ガイド](./docs/DEPLOYMENT.ja.md#github-oauth-app-の設定))
 
 ### Docker Compose で起動
 
@@ -85,12 +86,18 @@ git clone https://github.com/compasstechlab/dora-yaki.git
 cd dora-yaki
 
 cp .env.example .env
-# .env を編集して GitHub トークンと GCP プロジェクト ID を設定
+# .env を編集して以下を設定:
+#   GITHUB_OAUTH_CLIENT_ID / GITHUB_OAUTH_CLIENT_SECRET (OAuth App から)
+#   AUTH_JWT_SECRET=$(openssl rand -base64 32)
+#   ENCRYPTION_KEY_BASE64=$(openssl rand -base64 32)
+#   JOB_AUTH_KEY=$(openssl rand -base64 32)
 
 docker compose up
 ```
 
-アプリケーション: http://localhost:7201
+http://localhost:7201/ にアクセスすると GitHub のログイン画面に遷移します。
+
+> **認証**: `/api/auth/*` と運用用エンドポイント以外のすべての API はログイン必須です。各ユーザーは自分の GitHub アカウントでログインし、OAuth トークンは暗号化されて Datastore に保存されます。環境変数の詳細は [開発ガイド](./docs/DEVELOPMENT.md) を参照してください。
 
 ## ドキュメント
 

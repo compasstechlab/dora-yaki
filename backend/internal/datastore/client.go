@@ -18,16 +18,19 @@ type Client struct {
 
 // Kind names for Datastore entities
 const (
-	KindRepository   = "Repository"
-	KindPullRequest  = "PullRequest"
-	KindReview       = "Review"
-	KindDeployment   = "Deployment"
-	KindDailyMetrics = "DailyMetrics"
-	KindTeamMember   = "TeamMember"
-	KindSprint       = "Sprint"
-	KindMetricsCache = "MetricsCache"
-	KindBotUser      = "BotUser"
-	KindSyncLock     = "SyncLock"
+	KindRepository       = "Repository"
+	KindPullRequest      = "PullRequest"
+	KindReview           = "Review"
+	KindDeployment       = "Deployment"
+	KindDailyMetrics     = "DailyMetrics"
+	KindTeamMember       = "TeamMember"
+	KindSprint           = "Sprint"
+	KindMetricsCache     = "MetricsCache"
+	KindBotUser          = "BotUser"
+	KindSyncLock         = "SyncLock"
+	KindUser             = "User"
+	KindUserGitHubToken  = "UserGitHubToken" //nolint:gosec // datastore kind name, not a credential
+	KindRepositoryAccess = "RepositoryAccess"
 )
 
 // NewClient creates a new Datastore client

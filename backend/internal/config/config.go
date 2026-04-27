@@ -16,23 +16,69 @@ type Config struct {
 	Port                string
 	Environment         string
 	GCPProjectID        string
-	GitHubToken         string
 	TZOffset            string // Timezone offset (e.g. "+09:00", "-05:30")
 	SyncIntervalMinutes int    // Sync interval in minutes (default: 60)
 	SyncLockTTLMinutes  int    // Lock TTL in minutes (default: 10)
+
+	// GitHub OAuth App credentials.
+	GitHubOAuthClientID     string
+	GitHubOAuthClientSecret string
+	OAuthRedirectURL        string // Absolute URL of /api/auth/github/callback
+
+	// Session signing.
+	AuthJWTSecret    string
+	AuthCookieDomain string
+	FrontendURL      string // Frontend origin used for post-login redirects (e.g. "/" or "https://example.com")
+	JobAuthKey       string // Scheduler/job エンドポイント用の共有キー
+
+	// Encryption: KMS preferred, base64 AES-256 fallback.
+	EncryptionKMSKey    string
+	EncryptionKeyBase64 string
 }
 
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
-		Port:                getEnv("PORT", "7202"),
-		Environment:         getEnv("ENVIRONMENT", "development"),
-		GCPProjectID:        resolveProjectID(),
-		GitHubToken:         getEnv("GITHUB_TOKEN", ""),
-		TZOffset:            getEnv("TZ_OFFSET", ""),
-		SyncIntervalMinutes: getEnvInt("SYNC_INTERVAL_MINUTES", 60),
-		SyncLockTTLMinutes:  getEnvInt("SYNC_LOCK_TTL_MINUTES", 10),
+		Port:                    getEnv("PORT", "7202"),
+		Environment:             getEnv("ENVIRONMENT", "development"),
+		GCPProjectID:            resolveProjectID(),
+		TZOffset:                getEnv("TZ_OFFSET", ""),
+		SyncIntervalMinutes:     getEnvInt("SYNC_INTERVAL_MINUTES", 60),
+		SyncLockTTLMinutes:      getEnvInt("SYNC_LOCK_TTL_MINUTES", 10),
+		GitHubOAuthClientID:     getEnv("GITHUB_OAUTH_CLIENT_ID", ""),
+		GitHubOAuthClientSecret: getEnv("GITHUB_OAUTH_CLIENT_SECRET", ""),
+		OAuthRedirectURL:        getEnv("OAUTH_REDIRECT_URL", ""),
+		AuthJWTSecret:           getEnv("AUTH_JWT_SECRET", ""),
+		AuthCookieDomain:        getEnv("AUTH_COOKIE_DOMAIN", ""),
+		FrontendURL:             getEnv("FRONTEND_URL", ""),
+		JobAuthKey:              getEnv("JOB_AUTH_KEY", ""),
+		EncryptionKMSKey:        getEnv("ENCRYPTION_KMS_KEY", ""),
+		EncryptionKeyBase64:     getEnv("ENCRYPTION_KEY_BASE64", ""),
 	}
+}
+
+// MustValidate aborts if any required field is missing. OAuth login is mandatory.
+func (c *Config) MustValidate() error {
+	missing := []string{}
+	if c.GitHubOAuthClientID == "" {
+		missing = append(missing, "GITHUB_OAUTH_CLIENT_ID")
+	}
+	if c.GitHubOAuthClientSecret == "" {
+		missing = append(missing, "GITHUB_OAUTH_CLIENT_SECRET")
+	}
+	if c.AuthJWTSecret == "" {
+		missing = append(missing, "AUTH_JWT_SECRET")
+	}
+	if c.EncryptionKMSKey == "" && c.EncryptionKeyBase64 == "" {
+		missing = append(missing, "ENCRYPTION_KMS_KEY or ENCRYPTION_KEY_BASE64")
+	}
+	if c.IsProduction() && c.JobAuthKey == "" {
+		missing = append(missing, "JOB_AUTH_KEY")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 // IsDevelopment returns true if running in development mode

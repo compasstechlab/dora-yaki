@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/compasstechlab/dora-yaki/internal/api/middleware"
+	"github.com/compasstechlab/dora-yaki/internal/auth"
 	"github.com/compasstechlab/dora-yaki/internal/datastore"
 	"github.com/compasstechlab/dora-yaki/internal/domain/model"
 	"github.com/compasstechlab/dora-yaki/internal/github"
@@ -17,21 +19,58 @@ import (
 
 // RepositoryHandler handles repository-related API requests
 type RepositoryHandler struct {
-	ds        *datastore.Client
-	gh        *github.Client
-	collector *github.Collector
-	logger    *slog.Logger
-	cache     *middleware.ResponseCache
+	ds      *datastore.Client
+	factory *github.ClientFactory
+	pool    *github.TokenPool
+	logger  *slog.Logger
+	cache   *middleware.ResponseCache
 }
 
-// NewRepositoryHandler creates a new RepositoryHandler
-func NewRepositoryHandler(ds *datastore.Client, gh *github.Client, logger *slog.Logger, cache *middleware.ResponseCache) *RepositoryHandler {
+// NewRepositoryHandler creates a new RepositoryHandler.
+func NewRepositoryHandler(
+	ds *datastore.Client,
+	factory *github.ClientFactory,
+	pool *github.TokenPool,
+	logger *slog.Logger,
+	cache *middleware.ResponseCache,
+) *RepositoryHandler {
 	return &RepositoryHandler{
-		ds:        ds,
-		gh:        gh,
-		collector: github.NewCollector(gh, logger),
-		logger:    logger,
-		cache:     cache,
+		ds:      ds,
+		factory: factory,
+		pool:    pool,
+		logger:  logger,
+		cache:   cache,
+	}
+}
+
+// callerClient returns the GitHub client for the caller, scoped to their token.
+func (h *RepositoryHandler) callerClient(r *http.Request) (*github.Client, string, error) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		return nil, "", github.ErrNoToken
+	}
+	c, err := h.factory.ForUser(r.Context(), claims.UserID)
+	if err != nil {
+		return nil, claims.UserID, err
+	}
+	return c, claims.UserID, nil
+}
+
+// seedRepositoryAccess marks a (user, repo) pair as a confirmed candidate so
+// the user can view the repo's data and contributes to the sync rotation pool.
+func (h *RepositoryHandler) seedRepositoryAccess(ctx context.Context, userID, repoID string) {
+	if userID == "" {
+		return
+	}
+	now := time.Now()
+	if err := h.ds.SaveRepositoryAccess(ctx, &model.RepositoryAccess{
+		UserID:           userID,
+		RepositoryID:     repoID,
+		CanAccess:        true,
+		IsTokenCandidate: true,
+		CheckedAt:        now,
+	}); err != nil {
+		h.logger.Warn("seed repository access", "userID", userID, "repoID", repoID, "error", err)
 	}
 }
 
@@ -75,6 +114,13 @@ func (h *RepositoryHandler) BatchAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	client, userID, err := h.callerClient(r)
+	if err != nil {
+		h.logger.Warn("caller client", "error", err)
+		respondJSON(w, http.StatusUnauthorized, map[string]string{"error": "github_token_invalid"})
+		return
+	}
+
 	results := make([]BatchAddResult, 0, len(req.Repositories))
 	for _, repoReq := range req.Repositories {
 		result := BatchAddResult{
@@ -88,8 +134,8 @@ func (h *RepositoryHandler) BatchAdd(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Fetch repository info from GitHub
-		repo, err := h.gh.GetRepository(ctx, repoReq.Owner, repoReq.Name)
+		// Fetch repository info from GitHub using the caller's token.
+		repo, err := client.GetRepository(ctx, repoReq.Owner, repoReq.Name)
 		if err != nil {
 			h.logger.Error("failed to get repository from GitHub", "error", err, "owner", repoReq.Owner, "name", repoReq.Name)
 			result.Error = "repository not found on GitHub"
@@ -105,6 +151,8 @@ func (h *RepositoryHandler) BatchAdd(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		h.seedRepositoryAccess(ctx, userID, repo.ID)
+
 		result.Success = true
 		result.Repository = repo
 		results = append(results, result)
@@ -113,7 +161,8 @@ func (h *RepositoryHandler) BatchAdd(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, results)
 }
 
-// List returns all repositories
+// List returns repositories the caller has access to. In legacy single-token
+// mode (no auth claims), all repositories are returned.
 func (h *RepositoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -124,7 +173,34 @@ func (h *RepositoryHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if claims, ok := auth.FromContext(ctx); ok {
+		allowedIDs, err := h.ds.ListAccessibleRepositoryIDsByUser(ctx, claims.UserID)
+		if err != nil {
+			h.logger.Error("failed to list accessible repos", "error", err)
+			http.Error(w, "failed to list repositories", http.StatusInternalServerError)
+			return
+		}
+		repos = filterReposByID(repos, allowedIDs)
+	}
+
 	respondJSON(w, http.StatusOK, repos)
+}
+
+func filterReposByID(repos []*model.Repository, ids []string) []*model.Repository {
+	if len(repos) == 0 {
+		return repos
+	}
+	allowed := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		allowed[id] = struct{}{}
+	}
+	out := repos[:0]
+	for _, r := range repos {
+		if _, ok := allowed[r.ID]; ok {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // Add adds a new repository
@@ -142,8 +218,15 @@ func (h *RepositoryHandler) Add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch repository from GitHub
-	repo, err := h.gh.GetRepository(ctx, req.Owner, req.Name)
+	client, userID, err := h.callerClient(r)
+	if err != nil {
+		h.logger.Warn("caller client", "error", err)
+		respondJSON(w, http.StatusUnauthorized, map[string]string{"error": "github_token_invalid"})
+		return
+	}
+
+	// Fetch repository from GitHub using the caller's token.
+	repo, err := client.GetRepository(ctx, req.Owner, req.Name)
 	if err != nil {
 		h.logger.Error("failed to get repository from GitHub", "error", err)
 		http.Error(w, "repository not found on GitHub", http.StatusNotFound)
@@ -157,13 +240,28 @@ func (h *RepositoryHandler) Add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.seedRepositoryAccess(ctx, userID, repo.ID)
+
 	respondJSON(w, http.StatusCreated, repo)
 }
 
-// Get returns a specific repository
+// Get returns a specific repository if the caller has access to it.
 func (h *RepositoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := getPathParam(r, "id")
+
+	if claims, ok := auth.FromContext(ctx); ok {
+		access, err := h.ds.GetRepositoryAccess(ctx, claims.UserID, id)
+		if err != nil {
+			h.logger.Error("get repository access", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if access == nil || !access.CanAccess {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
 
 	repo, err := h.ds.GetRepository(ctx, id)
 	if err != nil {
@@ -225,9 +323,20 @@ func (h *RepositoryHandler) Sync(w http.ResponseWriter, r *http.Request) {
 	}
 	opts := github.CollectOptionsForRange(syncRange)
 
-	// Collect data from GitHub
-	data, err := h.collector.CollectAll(ctx, owner, name, opts)
-	if err != nil {
+	// Collect data from GitHub. Use the rotation pool when configured so the
+	// failing user's token is automatically marked invalid and the next
+	// candidate retries.
+	var data *github.CollectedData
+	collect := func(client *github.Client) error {
+		c := github.NewCollector(client, h.logger)
+		d, err := c.CollectAll(ctx, owner, name, opts)
+		if err != nil {
+			return err
+		}
+		data = d
+		return nil
+	}
+	if err := h.pool.RunWithRetry(ctx, id, collect); err != nil {
 		h.logger.Error("failed to sync repository", "error", err)
 		http.Error(w, "failed to sync repository", http.StatusInternalServerError)
 		return

@@ -1,9 +1,9 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { api, type BotUser, type CycleTimeMetrics, type ReviewMetrics } from '$api/client';
-import { addFlash } from '$stores/flash';
 import { browser } from '$app/environment';
 import { t } from '$i18n';
+import { addFlash } from '$stores/flash';
 import { dateRange, formatHours } from '$stores/metrics';
 import { selectedRepositories } from '$stores/repositories';
 

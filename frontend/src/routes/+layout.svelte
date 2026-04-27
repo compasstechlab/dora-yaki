@@ -4,18 +4,37 @@ import { onMount } from 'svelte';
 import FlashMessage from '$components/FlashMessage.svelte';
 import PeriodSelector from '$components/PeriodSelector.svelte';
 import { LOCALE_NAMES, LOCALES, type Locale, locale, t } from '$i18n';
+import { authChecked, authUser, checkAuth, logout } from '$stores/auth';
 import { repositories, selectedRepositories } from '$stores/repositories';
 import '../app.css';
 
 let { children }: { children: Snippet } = $props();
 
 let currentPath = $state('/');
+let isLoginRoute = $state(false);
 
 onMount(async () => {
+	currentPath = window.location.pathname;
+	isLoginRoute = currentPath === '/login';
+
+	if (isLoginRoute) {
+		// Login page handles its own auth check; do not redirect.
+		return;
+	}
+
+	const user = await checkAuth();
+	if (!user) {
+		window.location.href = '/login';
+		return;
+	}
 	locale.init();
 	await repositories.load();
-	currentPath = window.location.pathname;
 });
+
+async function handleLogout() {
+	await logout();
+	window.location.href = '/login';
+}
 
 let navItems = $derived([
 	{ path: '/', label: $t('nav.dashboard'), icon: '📊' },
@@ -62,75 +81,104 @@ function handleLocaleChange(e: Event) {
 
 <FlashMessage />
 
-<div class="layout">
-	<aside class="sidebar">
-		<div class="logo">
-			<span class="logo-icon">📊</span>
-			<span class="logo-text">DORA-yaki</span>
-		</div>
+{#if isLoginRoute}
+	{@render children()}
+{:else if !$authChecked}
+	<div class="loading">Loading…</div>
+{:else if !$authUser}
+	<div class="loading">Redirecting…</div>
+{:else}
+	<div class="layout">
+		<aside class="sidebar">
+			<div class="logo">
+				<span class="logo-icon">📊</span>
+				<span class="logo-text">DORA-yaki</span>
+			</div>
 
-		<nav class="nav">
-			{#each navItems as item}<a
-				href={item.path}
-				class="nav-item"
-				class:active={item.path === "/"
+			<nav class="nav">
+				{#each navItems as item}<a
+					href={item.path}
+					class="nav-item"
+					class:active={item.path === "/"
             ? currentPath === "/"
             : currentPath === item.path ||
               currentPath.startsWith(item.path + "/")}
-				onclick={() => (currentPath = item.path)}
-			>
-				<span class="nav-icon">{item.icon}</span>
-				<span class="nav-label">{item.label}</span>
-			</a>{/each}
-		</nav>
+					onclick={() => (currentPath = item.path)}
+				>
+					<span class="nav-icon">{item.icon}</span>
+					<span class="nav-label">{item.label}</span>
+				</a>{/each}
+			</nav>
 
-		<div class="sidebar-footer">
-			<div class="lang-selector">
-				<span class="lang-label"><span class="lang-icon">🌐</span> {$t("language.label")}</span>
-				<select class="lang-select" value={$locale} onchange={handleLocaleChange}>
-					{#each LOCALES as loc}
-						<option value={loc}>{LOCALE_NAMES[loc]}</option>
-					{/each}
-				</select>
-			</div>
+			<div class="sidebar-footer">
+				{#if $authUser}
+					<div class="user-info">
+						{#if $authUser.avatarUrl}
+							<img
+								src={$authUser.avatarUrl}
+								alt=""
+								class="user-avatar"
+								referrerpolicy="no-referrer"
+							>
+						{/if}
+						<span class="user-name" title={$authUser.name || $authUser.login}>
+							{$authUser.login}
+						</span>
+						<button class="logout-btn" onclick={handleLogout} title="Logout">⏻</button>
+					</div>
+				{/if}
 
-			<PeriodSelector />
-
-			<div class="repo-selector">
-				<div class="repo-selector-header">
-					<span class="repo-selector-title">{$t("common.repository")}</span>
-					<span class="repo-selector-badge">{selectionLabel}</span>
+				<div class="lang-selector">
+					<span class="lang-label"><span class="lang-icon">🌐</span> {$t("language.label")}</span>
+					<select class="lang-select" value={$locale} onchange={handleLocaleChange}>
+						{#each LOCALES as loc}
+							<option value={loc}>{LOCALE_NAMES[loc]}</option>
+						{/each}
+					</select>
 				</div>
-				<label class="repo-checkbox repo-checkbox-all">
-					<input type="checkbox" checked={isAllSelected} onchange={toggleAll}>
-					<span>{$t("common.all")}</span>
-				</label>
-				{#each $repositories as repo}
-					<label class="repo-checkbox">
-						<input
-							type="checkbox"
-							checked={isAllSelected || $selectedRepositories.includes(repo.id)}
-							disabled={isAllSelected}
-							onchange={() => toggleRepo(repo.id)}
-						>
-						<span>{repo.fullName}</span>
-					</label>
-				{/each}
-			</div>
-		</div>
-	</aside>
 
-	<main class="main">
-		{@render children()}
-		<footer class="app-footer">
-			<a href="https://github.com/compasstechlab/dora-yaki" target="_blank" rel="noopener noreferrer">
-				{$t('footer.sourceCode')}
-			</a>
-			<span class="footer-separator">|</span>
-			<span>{$t('footer.license')}</span>
-		</footer>
-	</main>
-</div>
+				<PeriodSelector />
+
+				<div class="repo-selector">
+					<div class="repo-selector-header">
+						<span class="repo-selector-title">{$t("common.repository")}</span>
+						<span class="repo-selector-badge">{selectionLabel}</span>
+					</div>
+					<label class="repo-checkbox repo-checkbox-all">
+						<input type="checkbox" checked={isAllSelected} onchange={toggleAll}>
+						<span>{$t("common.all")}</span>
+					</label>
+					{#each $repositories as repo}
+						<label class="repo-checkbox">
+							<input
+								type="checkbox"
+								checked={isAllSelected || $selectedRepositories.includes(repo.id)}
+								disabled={isAllSelected}
+								onchange={() => toggleRepo(repo.id)}
+							>
+							<span>{repo.fullName}</span>
+						</label>
+					{/each}
+				</div>
+			</div>
+		</aside>
+
+		<main class="main">
+			{@render children()}
+			<footer class="app-footer">
+				<a
+					href="https://github.com/compasstechlab/dora-yaki"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					{$t('footer.sourceCode')}
+				</a>
+				<span class="footer-separator">|</span>
+				<span>{$t('footer.license')}</span>
+			</footer>
+		</main>
+	</div>
+{/if}
 
 <style>
 .layout {
@@ -209,6 +257,61 @@ function handleLocaleChange(e: Event) {
 	border-top: 1px solid rgba(255, 255, 255, 0.1);
 	max-height: 40vh;
 	overflow-y: auto;
+}
+
+.user-info {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem;
+	margin-bottom: 0.75rem;
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: var(--radius-sm);
+}
+
+.user-avatar {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.user-name {
+	flex: 1;
+	font-size: 0.8125rem;
+	color: rgba(255, 255, 255, 0.85);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.logout-btn {
+	background: rgba(255, 255, 255, 0.1);
+	color: rgba(255, 255, 255, 0.7);
+	border: none;
+	border-radius: var(--radius-sm);
+	width: 26px;
+	height: 26px;
+	font-size: 0.875rem;
+	cursor: pointer;
+	flex-shrink: 0;
+	transition:
+		background 0.15s ease,
+		color 0.15s ease;
+}
+
+.logout-btn:hover {
+	background: rgba(239, 68, 68, 0.4);
+	color: white;
+}
+
+.loading {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--color-text-muted, #6b7280);
+	font-size: 0.875rem;
 }
 
 .lang-selector {

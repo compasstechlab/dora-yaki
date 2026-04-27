@@ -28,23 +28,27 @@ const (
 
 // JobHandler handles batch job API requests.
 type JobHandler struct {
-	ds        *datastore.Client
-	gh        *github.Client
-	collector *github.Collector
-	logger    *slog.Logger
-	cache     *middleware.ResponseCache
-	cfg       *config.Config
+	ds     *datastore.Client
+	pool   *github.TokenPool
+	logger *slog.Logger
+	cache  *middleware.ResponseCache
+	cfg    *config.Config
 }
 
 // NewJobHandler creates a new JobHandler.
-func NewJobHandler(ds *datastore.Client, gh *github.Client, logger *slog.Logger, cache *middleware.ResponseCache, cfg *config.Config) *JobHandler {
+func NewJobHandler(
+	ds *datastore.Client,
+	pool *github.TokenPool,
+	logger *slog.Logger,
+	cache *middleware.ResponseCache,
+	cfg *config.Config,
+) *JobHandler {
 	return &JobHandler{
-		ds:        ds,
-		gh:        gh,
-		collector: github.NewCollector(gh, logger),
-		logger:    logger,
-		cache:     cache,
-		cfg:       cfg,
+		ds:     ds,
+		pool:   pool,
+		logger: logger,
+		cache:  cache,
+		cfg:    cfg,
 	}
 }
 
@@ -338,9 +342,21 @@ func (h *JobHandler) syncSingleRepo(ctx context.Context, repo *model.Repository,
 
 	opts := github.CollectOptionsForRange(syncRange)
 
-	// Collect data from GitHub
-	data, err := h.collector.CollectAll(ctx, repo.Owner, repo.Name, opts)
-	if err != nil {
+	// Collect data from GitHub. When the rotation pool is configured we run via
+	// it so failed tokens are marked invalid and the next candidate is tried;
+	// otherwise we fall back to the shared client (legacy single-token mode).
+	var data *github.CollectedData
+	collect := func(client *github.Client) error {
+		c := github.NewCollector(client, h.logger)
+		d, err := c.CollectAll(ctx, repo.Owner, repo.Name, opts)
+		if err != nil {
+			return err
+		}
+		data = d
+		return nil
+	}
+
+	if err := h.pool.RunWithRetry(ctx, repo.ID, collect); err != nil {
 		h.logger.Error("failed to sync repository",
 			"repository", repo.FullName,
 			"error", err,

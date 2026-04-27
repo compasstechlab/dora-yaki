@@ -9,6 +9,8 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:7202",
         changeOrigin: true,
+        // Pass redirects (e.g. OAuth 302) through to the browser instead of following them.
+        followRedirects: false,
       },
     },
   },

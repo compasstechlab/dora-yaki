@@ -198,7 +198,8 @@ const ja: TranslationDict = {
 		pageTitle: 'チーム | DORA-yaki',
 		title: 'チームパフォーマンス',
 		noMembers: 'チームメンバーが見つかりません。リポジトリを同期してください。',
-		noActiveMembers: '選択した期間にアクティブなメンバーがいません。「アクティブのみ表示」を解除すると全メンバーが表示されます。',
+		noActiveMembers:
+			'選択した期間にアクティブなメンバーがいません。「アクティブのみ表示」を解除すると全メンバーが表示されます。',
 		prsCreated: 'PR作成',
 		merged: 'マージ',
 		reviews: 'レビュー',
@@ -575,7 +576,8 @@ const en: TranslationDict = {
 		pageTitle: 'Team | DORA-yaki',
 		title: 'Team Performance',
 		noMembers: 'No team members found. Please sync repositories.',
-		noActiveMembers: 'No active members in the selected period. Uncheck "Active only" to show all members.',
+		noActiveMembers:
+			'No active members in the selected period. Uncheck "Active only" to show all members.',
 		prsCreated: 'PRs Created',
 		merged: 'Merged',
 		reviews: 'Reviews',
@@ -1697,7 +1699,8 @@ const ko: TranslationDict = {
 		pageTitle: '팀 | DORA-yaki',
 		title: '팀 퍼포먼스',
 		noMembers: '팀 멤버를 찾을 수 없습니다. 저장소를 동기화해주세요.',
-		noActiveMembers: '선택한 기간에 활동 멤버가 없습니다. "활동 멤버만"을 해제하면 모든 멤버가 표시됩니다.',
+		noActiveMembers:
+			'선택한 기간에 활동 멤버가 없습니다. "활동 멤버만"을 해제하면 모든 멤버가 표시됩니다.',
 		prsCreated: 'PR 생성',
 		merged: '머지',
 		reviews: '리뷰',
@@ -2074,7 +2077,8 @@ const es: TranslationDict = {
 		pageTitle: 'Equipo | DORA-yaki',
 		title: 'Rendimiento del Equipo',
 		noMembers: 'No se encontraron miembros. Sincronice los repositorios.',
-		noActiveMembers: 'No hay miembros activos en el período seleccionado. Desmarque "Solo activos" para mostrar todos.',
+		noActiveMembers:
+			'No hay miembros activos en el período seleccionado. Desmarque "Solo activos" para mostrar todos.',
 		prsCreated: 'PRs Creados',
 		merged: 'Mergeados',
 		reviews: 'Revisiones',
@@ -2446,7 +2450,8 @@ const fr: TranslationDict = {
 		pageTitle: 'Équipe | DORA-yaki',
 		title: "Performance de l'équipe",
 		noMembers: 'Aucun membre trouvé. Synchronisez les dépôts.',
-		noActiveMembers: 'Aucun membre actif dans la période sélectionnée. Décochez « Actifs uniquement » pour tout afficher.',
+		noActiveMembers:
+			'Aucun membre actif dans la période sélectionnée. Décochez « Actifs uniquement » pour tout afficher.',
 		prsCreated: 'PRs créés',
 		merged: 'Mergés',
 		reviews: 'Revues',
@@ -2823,7 +2828,8 @@ const de: TranslationDict = {
 		pageTitle: 'Team | DORA-yaki',
 		title: 'Teamleistung',
 		noMembers: 'Keine Teammitglieder gefunden. Bitte Repositories synchronisieren.',
-		noActiveMembers: 'Keine aktiven Mitglieder im gewählten Zeitraum. Deaktivieren Sie „Nur Aktive", um alle anzuzeigen.',
+		noActiveMembers:
+			'Keine aktiven Mitglieder im gewählten Zeitraum. Deaktivieren Sie „Nur Aktive", um alle anzuzeigen.',
 		prsCreated: 'PRs erstellt',
 		merged: 'Gemergt',
 		reviews: 'Reviews',

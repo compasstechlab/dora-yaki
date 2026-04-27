@@ -8,8 +8,8 @@ import {
 	type GitHubOrgRepo,
 	type SyncResponse,
 } from '$api/client';
-import { addFlash } from '$stores/flash';
 import { locale, t } from '$i18n';
+import { addFlash } from '$stores/flash';
 import { repositories, selectedRepositories } from '$stores/repositories';
 
 // Data date ranges
@@ -93,7 +93,7 @@ async function fetchOwnerRepos() {
 	batchResults = [];
 
 	try {
-		ownerRepos = await api.github.listOwnerRepos(ownerName, repoType || undefined) ?? [];
+		ownerRepos = (await api.github.listOwnerRepos(ownerName, repoType || undefined)) ?? [];
 		hasSearched = true;
 	} catch (e) {
 		searchError = e instanceof Error ? e.message : $t('repositories.fetchFailed');

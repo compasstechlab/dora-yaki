@@ -10,6 +10,8 @@ let { data }: { data: DailyMetrics[] } = $props();
 let canvas: HTMLCanvasElement;
 let chart: ChartInstance | null = null;
 
+type ScaleWithTitle = { title?: { text?: string } };
+
 onMount(async () => {
 	const { Chart, registerables } = await import('chart.js');
 	Chart.register(...registerables);
@@ -97,7 +99,8 @@ $effect(() => {
 		chart.data.datasets[1].data = data.map((d) => d.prsMerged);
 		chart.data.datasets[2].label = tr('chart.reviewLabel');
 		chart.data.datasets[2].data = data.map((d) => d.reviewsSubmitted);
-		chart.options.scales.y.title.text = tr('chart.count');
+		const yScale = chart.options.scales?.y as ScaleWithTitle | undefined;
+		if (yScale?.title) yScale.title.text = tr('chart.count');
 		chart.update();
 	}
 });

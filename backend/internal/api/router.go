@@ -3,11 +3,14 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/compasstechlab/dora-yaki/internal/api/handler"
 	"github.com/compasstechlab/dora-yaki/internal/api/middleware"
+	"github.com/compasstechlab/dora-yaki/internal/auth"
 	"github.com/compasstechlab/dora-yaki/internal/config"
+	"github.com/compasstechlab/dora-yaki/internal/crypto"
 	"github.com/compasstechlab/dora-yaki/internal/datastore"
 	"github.com/compasstechlab/dora-yaki/internal/github"
 )
@@ -20,110 +23,162 @@ type Router struct {
 	cache      *middleware.ResponseCache
 }
 
-// NewRouter creates a new Router
-func NewRouter(ds *datastore.Client, gh *github.Client, logger *slog.Logger, cfg *config.Config) *Router {
-	// Create a 3-tier response cache with 50-minute TTL
-	cache := middleware.NewResponseCache(50*time.Minute, ds, logger)
+// RouterDeps bundles the dependencies needed to construct the Router.
+// All fields are required: OAuth login is mandatory.
+type RouterDeps struct {
+	DS            *datastore.Client
+	Logger        *slog.Logger
+	Config        *config.Config
+	Encryptor     crypto.Encryptor
+	OAuthConfig   *auth.GitHubOAuthConfig
+	JWTSecret     []byte
+	ClientFactory *github.ClientFactory
+	TokenPool     *github.TokenPool
+}
+
+// NewRouterWithDeps creates a new Router with full auth wiring.
+func NewRouterWithDeps(deps RouterDeps) *Router {
+	cache := middleware.NewResponseCache(50*time.Minute, deps.DS, deps.Logger)
 
 	r := &Router{
 		mux:    http.NewServeMux(),
-		logger: logger,
+		logger: deps.Logger,
 		cache:  cache,
 	}
 
-	// Setup middleware chain
 	r.middleware = middleware.Chain(
-		middleware.Recovery(logger),
-		middleware.Logger(logger),
-		middleware.CORS([]string{"*"}),
+		middleware.Recovery(deps.Logger),
+		middleware.Logger(deps.Logger),
+		middleware.CORS(corsAllowedOrigins(deps.Config.FrontendURL)),
 		middleware.RequestID(),
 	)
 
-	// Initialize handlers
-	repoHandler := handler.NewRepositoryHandler(ds, gh, logger, cache)
-	metricsHandler := handler.NewMetricsHandler(ds, logger)
-	sprintHandler := handler.NewSprintHandler(ds, logger)
-	teamHandler := handler.NewTeamHandler(ds, logger)
-	githubHandler := handler.NewGitHubHandler(gh, logger)
-	botUserHandler := handler.NewBotUserHandler(ds, logger)
-	jobHandler := handler.NewJobHandler(ds, gh, logger, cache, cfg)
+	repoHandler := handler.NewRepositoryHandler(deps.DS, deps.ClientFactory, deps.TokenPool, deps.Logger, cache)
+	metricsHandler := handler.NewMetricsHandler(deps.DS, deps.Logger)
+	sprintHandler := handler.NewSprintHandler(deps.DS, deps.Logger)
+	teamHandler := handler.NewTeamHandler(deps.DS, deps.Logger)
+	githubHandler := handler.NewGitHubHandler(deps.ClientFactory, deps.Logger)
+	botUserHandler := handler.NewBotUserHandler(deps.DS, deps.Logger)
+	jobHandler := handler.NewJobHandler(deps.DS, deps.TokenPool, deps.Logger, cache, deps.Config)
+	permissionCheckHandler := handler.NewPermissionCheckHandler(deps.DS, deps.ClientFactory, deps.Logger)
+	authHandler := handler.NewAuthHandler(
+		deps.DS,
+		deps.Encryptor,
+		deps.OAuthConfig,
+		deps.ClientFactory,
+		deps.JWTSecret,
+		deps.Config.AuthCookieDomain,
+		deps.Config.FrontendURL,
+		deps.Logger,
+	)
 
-	// Register routes
-	r.registerRoutes(repoHandler, metricsHandler, sprintHandler, teamHandler, githubHandler, botUserHandler, jobHandler)
+	r.registerRoutes(routeHandlers{
+		repo:            repoHandler,
+		metrics:         metricsHandler,
+		sprint:          sprintHandler,
+		team:            teamHandler,
+		github:          githubHandler,
+		botUser:         botUserHandler,
+		job:             jobHandler,
+		auth:            authHandler,
+		permissionCheck: permissionCheckHandler,
+	}, deps.JWTSecret, deps.Config.JobAuthKey)
 
 	return r
 }
 
-func (r *Router) registerRoutes(
-	repoHandler *handler.RepositoryHandler,
-	metricsHandler *handler.MetricsHandler,
-	sprintHandler *handler.SprintHandler,
-	teamHandler *handler.TeamHandler,
-	githubHandler *handler.GitHubHandler,
-	botUserHandler *handler.BotUserHandler,
-	jobHandler *handler.JobHandler,
-) {
-	// Cache middleware
-	cached := r.cache.Middleware()
+func corsAllowedOrigins(frontendURL string) []string {
+	if frontendURL == "" {
+		return []string{"*"}
+	}
+	u, err := url.Parse(frontendURL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return []string{"*"}
+	}
+	return []string{u.Scheme + "://" + u.Host}
+}
 
-	// Health check
+type routeHandlers struct {
+	repo            *handler.RepositoryHandler
+	metrics         *handler.MetricsHandler
+	sprint          *handler.SprintHandler
+	team            *handler.TeamHandler
+	github          *handler.GitHubHandler
+	botUser         *handler.BotUserHandler
+	job             *handler.JobHandler
+	auth            *handler.AuthHandler
+	permissionCheck *handler.PermissionCheckHandler
+}
+
+func (r *Router) registerRoutes(h routeHandlers, jwtSecret []byte, jobAuthKey string) {
+	cached := r.cache.Middleware()
+	gate := auth.RequireAuth(jwtSecret)
+	jobGate := middleware.JobAuth(jobAuthKey)
+
+	// Health check (always public).
 	r.mux.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Cache invalidation endpoint
+	// Cache invalidation (public for ops).
 	r.mux.HandleFunc("POST /api/cache/invalidate", func(w http.ResponseWriter, req *http.Request) {
 		r.cache.Invalidate()
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Repository endpoints (list is cached)
-	r.mux.Handle("GET /api/repositories", cached(http.HandlerFunc(repoHandler.List)))
-	r.mux.HandleFunc("POST /api/repositories", repoHandler.Add)
-	r.mux.HandleFunc("GET /api/repositories/{id}", repoHandler.Get)
-	r.mux.HandleFunc("DELETE /api/repositories/{id}", repoHandler.Delete)
-	r.mux.HandleFunc("POST /api/repositories/batch", repoHandler.BatchAdd)
-	r.mux.HandleFunc("POST /api/repositories/{id}/sync", repoHandler.Sync)
-	r.mux.Handle("GET /api/repositories/date-ranges", cached(http.HandlerFunc(repoHandler.DateRanges)))
+	// Auth routes (public).
+	r.mux.HandleFunc("GET /api/auth/github/login", h.auth.LoginRedirect)
+	r.mux.HandleFunc("GET /api/auth/github/callback", h.auth.Callback)
+	r.mux.HandleFunc("POST /api/auth/logout", h.auth.Logout)
+	r.mux.HandleFunc("GET /api/auth/me", h.auth.Me)
 
-	// GitHub proxy endpoints
-	r.mux.HandleFunc("GET /api/github/me", githubHandler.GetMe)
-	r.mux.HandleFunc("GET /api/github/owners/{owner}/repos", githubHandler.ListOwnerRepos)
+	// Repository endpoints (gated).
+	r.mux.Handle("GET /api/repositories", gate(cached(http.HandlerFunc(h.repo.List))))
+	r.mux.Handle("POST /api/repositories", gate(http.HandlerFunc(h.repo.Add)))
+	r.mux.Handle("GET /api/repositories/{id}", gate(http.HandlerFunc(h.repo.Get)))
+	r.mux.Handle("DELETE /api/repositories/{id}", gate(http.HandlerFunc(h.repo.Delete)))
+	r.mux.Handle("POST /api/repositories/batch", gate(http.HandlerFunc(h.repo.BatchAdd)))
+	r.mux.Handle("POST /api/repositories/{id}/sync", gate(http.HandlerFunc(h.repo.Sync)))
+	r.mux.Handle("GET /api/repositories/date-ranges", gate(cached(http.HandlerFunc(h.repo.DateRanges))))
 
-	// Metrics endpoints (cached)
-	r.mux.Handle("GET /api/metrics/cycle-time", cached(http.HandlerFunc(metricsHandler.CycleTime)))
-	r.mux.Handle("GET /api/metrics/reviews", cached(http.HandlerFunc(metricsHandler.Reviews)))
-	r.mux.Handle("GET /api/metrics/dora", cached(http.HandlerFunc(metricsHandler.DORA)))
-	r.mux.Handle("GET /api/metrics/productivity-score", cached(http.HandlerFunc(metricsHandler.ProductivityScore)))
-	r.mux.Handle("GET /api/metrics/daily", cached(http.HandlerFunc(metricsHandler.DailyMetrics)))
-	r.mux.Handle("GET /api/metrics/pull-requests", cached(http.HandlerFunc(metricsHandler.PullRequests)))
+	// GitHub proxy endpoints (gated).
+	r.mux.Handle("GET /api/github/me", gate(http.HandlerFunc(h.github.GetMe)))
+	r.mux.Handle("GET /api/github/owners/{owner}/repos", gate(http.HandlerFunc(h.github.ListOwnerRepos)))
 
-	// Sprint endpoints
-	r.mux.HandleFunc("GET /api/sprints", sprintHandler.List)
-	r.mux.HandleFunc("POST /api/sprints", sprintHandler.Create)
-	r.mux.HandleFunc("GET /api/sprints/{id}", sprintHandler.Get)
-	r.mux.HandleFunc("GET /api/sprints/{id}/performance", sprintHandler.GetPerformance)
+	// Metrics endpoints (gated, cached).
+	r.mux.Handle("GET /api/metrics/cycle-time", gate(cached(http.HandlerFunc(h.metrics.CycleTime))))
+	r.mux.Handle("GET /api/metrics/reviews", gate(cached(http.HandlerFunc(h.metrics.Reviews))))
+	r.mux.Handle("GET /api/metrics/dora", gate(cached(http.HandlerFunc(h.metrics.DORA))))
+	r.mux.Handle("GET /api/metrics/productivity-score", gate(cached(http.HandlerFunc(h.metrics.ProductivityScore))))
+	r.mux.Handle("GET /api/metrics/daily", gate(cached(http.HandlerFunc(h.metrics.DailyMetrics))))
+	r.mux.Handle("GET /api/metrics/pull-requests", gate(cached(http.HandlerFunc(h.metrics.PullRequests))))
 
-	// Bot user endpoints
-	r.mux.HandleFunc("GET /api/bot-users", botUserHandler.List)
-	r.mux.HandleFunc("POST /api/bot-users", botUserHandler.Add)
-	r.mux.HandleFunc("DELETE /api/bot-users", botUserHandler.Delete)
+	// Sprint endpoints (gated).
+	r.mux.Handle("GET /api/sprints", gate(http.HandlerFunc(h.sprint.List)))
+	r.mux.Handle("POST /api/sprints", gate(http.HandlerFunc(h.sprint.Create)))
+	r.mux.Handle("GET /api/sprints/{id}", gate(http.HandlerFunc(h.sprint.Get)))
+	r.mux.Handle("GET /api/sprints/{id}/performance", gate(http.HandlerFunc(h.sprint.GetPerformance)))
 
-	// Job endpoints
-	r.mux.HandleFunc("PUT /api/job/sync", jobHandler.Sync)
+	// Bot user endpoints (gated).
+	r.mux.Handle("GET /api/bot-users", gate(http.HandlerFunc(h.botUser.List)))
+	r.mux.Handle("POST /api/bot-users", gate(http.HandlerFunc(h.botUser.Add)))
+	r.mux.Handle("DELETE /api/bot-users", gate(http.HandlerFunc(h.botUser.Delete)))
 
-	// Team endpoints (cached)
-	r.mux.Handle("GET /api/team/members", cached(http.HandlerFunc(teamHandler.ListMembers)))
-	r.mux.Handle("GET /api/team/members/{id}/stats", cached(http.HandlerFunc(teamHandler.GetMemberStats)))
-	r.mux.Handle("GET /api/team/members/{id}/pull-requests", cached(http.HandlerFunc(teamHandler.GetMemberPullRequests)))
-	r.mux.Handle("GET /api/team/members/{id}/reviews", cached(http.HandlerFunc(teamHandler.GetMemberReviews)))
+	// Job endpoints (scheduler/shared-key gated).
+	r.mux.Handle("PUT /api/job/sync", jobGate(http.HandlerFunc(h.job.Sync)))
+	r.mux.Handle("PUT /api/job/permission-check", jobGate(http.HandlerFunc(h.permissionCheck.Run)))
+
+	// Team endpoints (gated, cached).
+	r.mux.Handle("GET /api/team/members", gate(cached(http.HandlerFunc(h.team.ListMembers))))
+	r.mux.Handle("GET /api/team/members/{id}/stats", gate(cached(http.HandlerFunc(h.team.GetMemberStats))))
+	r.mux.Handle("GET /api/team/members/{id}/pull-requests", gate(cached(http.HandlerFunc(h.team.GetMemberPullRequests))))
+	r.mux.Handle("GET /api/team/members/{id}/reviews", gate(cached(http.HandlerFunc(h.team.GetMemberReviews))))
 }
 
 // ServeHTTP implements http.Handler
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// Apply middleware and serve
 	handler := r.middleware(r.mux)
 	handler.ServeHTTP(w, req)
 }

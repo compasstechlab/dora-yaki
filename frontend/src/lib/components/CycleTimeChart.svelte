@@ -10,6 +10,8 @@ let { data }: { data: DailyMetrics[] } = $props();
 let canvas: HTMLCanvasElement;
 let chart: ChartInstance | null = null;
 
+type ScaleWithTitle = { title?: { text?: string } };
+
 function formatHours(hours: number): string {
 	const tr = get(t);
 	if (hours < 1) return `${Math.round(hours * 60)}${tr('chart.minutes')}`;
@@ -120,7 +122,8 @@ $effect(() => {
 		chart.data.datasets[1].data = data.map((d) => d.avgPickupTime);
 		chart.data.datasets[2].label = tr('chart.reviewTime');
 		chart.data.datasets[2].data = data.map((d) => d.avgReviewTime);
-		chart.options.scales.y.title.text = tr('chart.hours');
+		const yScale = chart.options.scales?.y as ScaleWithTitle | undefined;
+		if (yScale?.title) yScale.title.text = tr('chart.hours');
 		chart.update();
 	}
 });

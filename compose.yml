@@ -21,9 +21,22 @@ services:
       - PORT=7202
       - ENVIRONMENT=development
       - FUNCTION_TARGET=RunHTTPServer
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-local-dev}
       - DATASTORE_EMULATOR_HOST=datastore-emulator:8081
+      # GitHub OAuth App (https://github.com/settings/developers)
+      - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID}
+      - GITHUB_OAUTH_CLIENT_SECRET=${GITHUB_OAUTH_CLIENT_SECRET}
+      - OAUTH_REDIRECT_URL=${OAUTH_REDIRECT_URL:-http://localhost:7202/api/auth/github/callback}
+      # Session signing (32+ random bytes; `openssl rand -base64 32`)
+      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+      # Frontend origin used for post-login redirects.
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:7201}
+      # Shared key for /api/job/* endpoints. Empty means disabled for local dev.
+      - JOB_AUTH_KEY=${JOB_AUTH_KEY}
+      # Token-at-rest encryption: prefer ENCRYPTION_KMS_KEY in production.
+      # Local dev: provide a 32-byte AES-256 key (`openssl rand -base64 32`).
+      - ENCRYPTION_KEY_BASE64=${ENCRYPTION_KEY_BASE64}
+      # - ENCRYPTION_KMS_KEY=projects/.../locations/.../keyRings/.../cryptoKeys/...
     depends_on:
       - datastore-emulator
 
@@ -41,13 +54,19 @@ services:
   #   build:
   #     context: ./backend
   #     dockerfile: Dockerfile
-  # environment:
-  #   - PORT=7202
-  #   - ENVIRONMENT=development
-  #   - FUNCTION_TARGET=RunHTTPServer
-  #   - GITHUB_TOKEN=${GITHUB_TOKEN}
-  #   - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-  # volumes:
-  #   # Local dev only: mount host gcloud credentials (Use service account in production)
-  #   # `gcloud auth application-default login` to login before running `docker compose up`
-  #   - ~/.config/gcloud:/root/.config/gcloud:ro
+  #   environment:
+  #     - PORT=7202
+  #     - ENVIRONMENT=development
+  #     - FUNCTION_TARGET=RunHTTPServer
+  #     - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+  #     - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID}
+  #     - GITHUB_OAUTH_CLIENT_SECRET=${GITHUB_OAUTH_CLIENT_SECRET}
+  #     - OAUTH_REDIRECT_URL=${OAUTH_REDIRECT_URL}
+  #     - AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+  #     - FRONTEND_URL=${FRONTEND_URL}
+  #     - JOB_AUTH_KEY=${JOB_AUTH_KEY}
+  #     - ENCRYPTION_KEY_BASE64=${ENCRYPTION_KEY_BASE64}
+  #   volumes:
+  #     # Local dev only: mount host gcloud credentials (Use service account in production)
+  #     # `gcloud auth application-default login` to login before running `docker compose up`
+  #     - ~/.config/gcloud:/root/.config/gcloud:ro
