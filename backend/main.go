@@ -8,7 +8,9 @@ import (
 	"sync"
 
 	"github.com/compasstechlab/dora-yaki/internal/api"
+	"github.com/compasstechlab/dora-yaki/internal/auth"
 	"github.com/compasstechlab/dora-yaki/internal/config"
+	"github.com/compasstechlab/dora-yaki/internal/crypto"
 	"github.com/compasstechlab/dora-yaki/internal/datastore"
 	"github.com/compasstechlab/dora-yaki/internal/github"
 	"github.com/compasstechlab/dora-yaki/internal/timeutil"
@@ -34,6 +36,10 @@ func Init() {
 
 		// Load configuration
 		cfg := config.Load()
+		if err := cfg.MustValidate(); err != nil {
+			logger.Error("invalid configuration", "error", err)
+			os.Exit(1)
+		}
 
 		// Initialize timezone
 		timeutil.Init(cfg.Location())
@@ -43,25 +49,50 @@ func Init() {
 			"environment", cfg.Environment,
 		)
 
-		// Initialize GitHub client
-		ghClient := github.NewClient(cfg.GitHubToken)
-
 		// Initialize Datastore client
-		var dsClient *datastore.Client
-		if cfg.GCPProjectID != "" {
-			logger.Info("using GCP project", "projectID", cfg.GCPProjectID)
-			var err error
-			dsClient, err = datastore.NewClient(context.Background(), cfg.GCPProjectID)
-			if err != nil {
-				logger.Error("failed to create datastore client", "error", err)
-				os.Exit(1)
-			}
-		} else {
-			logger.Warn("GCP project ID not resolved (env/metadata), running without datastore")
+		if cfg.GCPProjectID == "" {
+			logger.Error("GCP project ID not resolved (env/metadata); set GCP_PROJECT_ID")
+			os.Exit(1)
+		}
+		logger.Info("using GCP project", "projectID", cfg.GCPProjectID)
+		dsClient, err := datastore.NewClient(context.Background(), cfg.GCPProjectID)
+		if err != nil {
+			logger.Error("failed to create datastore client", "error", err)
+			os.Exit(1)
 		}
 
-		// Create router
-		r := api.NewRouter(dsClient, ghClient, logger, cfg)
+		// Initialize encryption.
+		encryptor, err := crypto.NewFromConfig(context.Background(), crypto.FactoryConfig{
+			KMSKey:    cfg.EncryptionKMSKey,
+			KeyBase64: cfg.EncryptionKeyBase64,
+		})
+		if err != nil {
+			logger.Error("failed to initialize encryptor", "error", err)
+			os.Exit(1)
+		}
+
+		// Initialize OAuth wiring.
+		oauthCfg := &auth.GitHubOAuthConfig{
+			ClientID:     cfg.GitHubOAuthClientID,
+			ClientSecret: cfg.GitHubOAuthClientSecret,
+			RedirectURL:  cfg.OAuthRedirectURL,
+		}
+		jwtSecret := []byte(cfg.AuthJWTSecret)
+		clientFactory := github.NewClientFactory(dsClient, encryptor, oauthCfg, logger)
+		tokenPool := github.NewTokenPool(clientFactory, dsClient, logger)
+		logger.Info("oauth login enabled")
+
+		// Create router with all dependencies.
+		r := api.NewRouterWithDeps(api.RouterDeps{
+			DS:            dsClient,
+			Logger:        logger,
+			Config:        cfg,
+			Encryptor:     encryptor,
+			OAuthConfig:   oauthCfg,
+			JWTSecret:     jwtSecret,
+			ClientFactory: clientFactory,
+			TokenPool:     tokenPool,
+		})
 		router = r.Handler()
 	})
 }

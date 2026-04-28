@@ -47,3 +47,11 @@ resource "google_project_service" "firestore" {
 
   disable_on_destroy = false
 }
+
+# Cloud KMS API (for token-at-rest encryption when var.use_kms = true)
+resource "google_project_service" "cloudkms" {
+  project = var.project_id
+  service = "cloudkms.googleapis.com"
+
+  disable_on_destroy = false
+}

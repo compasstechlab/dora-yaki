@@ -58,6 +58,7 @@ Identify and manage bot accounts. View bot-specific PR and review metrics separa
 - **Team Analytics** — Per-member statistics with daily/weekly charts and PR/review history
 - **Bot User Management** — Exclude bot accounts from metrics or view bot-only metrics
 - **Multi-language Support** — 8 languages (ja, en, zh-TW, zh-CN, ko, es, fr, de) with browser auto-detection
+- **GitHub OAuth Login** — Per-user authentication; OAuth tokens stored encrypted in Datastore (AES-256-GCM or Cloud KMS); per-repository ACL refreshed daily
 
 ## Tech Stack
 
@@ -76,7 +77,7 @@ Identify and manage bot accounts. View bot-specific PR and review metrics separa
 ### Prerequisites
 
 - Docker & Docker Compose
-- GitHub Personal Access Token ([setup guide](./docs/DEPLOYMENT.md#github-token-setup))
+- A GitHub OAuth App ([setup guide](./docs/DEPLOYMENT.md#github-oauth-app-setup))
 
 ### Run with Docker Compose
 
@@ -85,12 +86,18 @@ git clone https://github.com/compasstechlab/dora-yaki.git
 cd dora-yaki
 
 cp .env.example .env
-# Edit .env with your GitHub token and GCP project ID
+# Generate the runtime secrets and paste the OAuth App credentials:
+#   AUTH_JWT_SECRET=$(openssl rand -base64 32)
+#   ENCRYPTION_KEY_BASE64=$(openssl rand -base64 32)
+#   JOB_AUTH_KEY=$(openssl rand -base64 32)
+#   GITHUB_OAUTH_CLIENT_ID / GITHUB_OAUTH_CLIENT_SECRET from your OAuth App
 
 docker compose up
 ```
 
-Access the application at http://localhost:7201
+Open http://localhost:7201/. You will be redirected to the GitHub login screen on first visit.
+
+> **Authentication**: every API endpoint (except `/api/auth/*` and ops paths) requires a logged-in user. Each user signs in with their own GitHub account; tokens are stored encrypted in Datastore. See the [Development Guide](./docs/DEVELOPMENT.md) for environment variable details.
 
 ## Documentation
 

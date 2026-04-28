@@ -1,11 +1,12 @@
 # Firestore database (Datastore Mode)
 resource "google_firestore_database" "default" {
+  count       = var.create_datastore_database ? 1 : 0
   project     = var.project_id
   name        = "(default)"
-  location_id = var.region
+  location_id = local.datastore_location_id
   type        = "DATASTORE_MODE"
 
-  depends_on = [google_firestore_database.default]
+  depends_on = [google_project_service.firestore]
 }
 
 # Datastore composite index definitions
@@ -29,7 +30,7 @@ resource "google_firestore_index" "pull_request_repo_created" {
     order      = "DESCENDING"
   }
 
-  depends_on = [google_firestore_database.default]
+  depends_on = [google_project_service.firestore, google_firestore_database.default]
 }
 
 # Review: filter by repository_id + sort by submitted_at DESC
@@ -50,7 +51,7 @@ resource "google_firestore_index" "review_repo_submitted" {
     order      = "DESCENDING"
   }
 
-  depends_on = [google_firestore_database.default]
+  depends_on = [google_project_service.firestore, google_firestore_database.default]
 }
 
 # Deployment: filter by repository_id + sort by created_at DESC
@@ -71,7 +72,7 @@ resource "google_firestore_index" "deployment_repo_created" {
     order      = "DESCENDING"
   }
 
-  depends_on = [google_firestore_database.default]
+  depends_on = [google_project_service.firestore, google_firestore_database.default]
 }
 
 # DailyMetrics: filter by repository_id + sort by date ASC
@@ -92,7 +93,7 @@ resource "google_firestore_index" "daily_metrics_repo_date" {
     order      = "ASCENDING"
   }
 
-  depends_on = [google_firestore_database.default]
+  depends_on = [google_project_service.firestore, google_firestore_database.default]
 }
 
 # Sprint: filter by repository_id + sort by start_date DESC
@@ -113,5 +114,5 @@ resource "google_firestore_index" "sprint_repo_start_date" {
     order      = "DESCENDING"
   }
 
-  depends_on = [google_firestore_database.default]
+  depends_on = [google_project_service.firestore, google_firestore_database.default]
 }

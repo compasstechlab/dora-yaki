@@ -19,6 +19,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 			'Content-Type': 'application/json',
 			...headers,
 		},
+		credentials: 'include',
 	};
 
 	if (body) {
@@ -32,6 +33,14 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 		const msg = e instanceof Error ? e.message : 'ネットワークエラーが発生しました';
 		if (!silent) addFlash('error', `API通信エラー: ${msg}`);
 		throw e;
+	}
+
+	if (response.status === 401) {
+		// Session expired or missing — push the user back to login.
+		if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+			window.location.href = '/login';
+		}
+		throw new Error('unauthorized');
 	}
 
 	if (!response.ok) {
