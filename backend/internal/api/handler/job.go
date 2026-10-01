@@ -333,6 +333,27 @@ func matchRepoName(repo *model.Repository, name string) bool {
 	return repo.FullName == name || repo.Name == name
 }
 
+// isIdentityMismatch : reports whether the collected repository has a different GitHub ID than the target (a rename keeps the ID).
+func isIdentityMismatch(target, collected *model.Repository) bool {
+	if target == nil || collected == nil || target.ID == "" || collected.ID == "" {
+		return false
+	}
+	return target.ID != collected.ID
+}
+
+// markSynced : advances LastSyncedAt and clears the in-progress marker. Called on every attempt so a failing repository cannot stall the rotation.
+func (h *JobHandler) markSynced(ctx context.Context, repo *model.Repository) {
+	now := timeutil.Now()
+	repo.LastSyncedAt = &now
+	repo.ProcessStartAt = nil
+	if err := h.ds.SaveRepository(ctx, repo); err != nil {
+		h.logger.Error("failed to update last_synced_at",
+			"repository", repo.FullName,
+			"error", err,
+		)
+	}
+}
+
 // syncSingleRepo executes sync for a single repository.
 func (h *JobHandler) syncSingleRepo(ctx context.Context, repo *model.Repository, syncRange string) RepoSyncResult {
 	result := RepoSyncResult{
@@ -361,7 +382,22 @@ func (h *JobHandler) syncSingleRepo(ctx context.Context, repo *model.Repository,
 			"repository", repo.FullName,
 			"error", err,
 		)
+		h.markSynced(ctx, repo)
 		result.Error = err.Error()
+		return result
+	}
+
+	// Writing here would store the data under the wrong entity, so skip it.
+	if isIdentityMismatch(repo, data.Repository) {
+		h.logger.Warn("repository identity mismatch: skipping sync",
+			"storedFullName", repo.FullName,
+			"storedID", repo.ID,
+			"githubFullName", data.Repository.FullName,
+			"githubID", data.Repository.ID,
+		)
+		h.markSynced(ctx, repo)
+		result.Error = fmt.Sprintf("identity mismatch: stored ID %s but %s resolves to ID %s",
+			repo.ID, repo.FullName, data.Repository.ID)
 		return result
 	}
 
@@ -399,11 +435,7 @@ func (h *JobHandler) syncSingleRepo(ctx context.Context, repo *model.Repository,
 	}
 
 	// Update LastSyncedAt
-	now := time.Now()
-	data.Repository.LastSyncedAt = &now
-	if err := h.ds.SaveRepository(ctx, data.Repository); err != nil {
-		h.logger.Error("failed to update last_synced_at", "error", err)
-	}
+	h.markSynced(ctx, data.Repository)
 
 	result.Success = true
 	result.PullRequests = len(data.PullRequests)

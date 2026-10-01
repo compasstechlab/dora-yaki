@@ -138,3 +138,57 @@ func TestPickSyncTarget(t *testing.T) {
 		})
 	}
 }
+
+func TestIsIdentityMismatch(t *testing.T) {
+	tests := []struct {
+		name      string
+		target    *model.Repository
+		collected *model.Repository
+		want      bool
+	}{
+		{
+			name:      "same ID is not a mismatch",
+			target:    &model.Repository{ID: "100", FullName: "org/repo"},
+			collected: &model.Repository{ID: "100", FullName: "org/repo"},
+			want:      false,
+		},
+		{
+			name:      "renamed repository keeps its ID",
+			target:    &model.Repository{ID: "100", FullName: "org/old-name"},
+			collected: &model.Repository{ID: "100", FullName: "org/new-name"},
+			want:      false,
+		},
+		{
+			name:      "different ID under the same name is a mismatch",
+			target:    &model.Repository{ID: "1184886794", FullName: "org/e-learning"},
+			collected: &model.Repository{ID: "1244386594", FullName: "org/e-learning"},
+			want:      true,
+		},
+		{
+			name:      "empty collected ID is not a mismatch",
+			target:    &model.Repository{ID: "100", FullName: "org/repo"},
+			collected: &model.Repository{FullName: "org/repo"},
+			want:      false,
+		},
+		{
+			name:      "empty target ID is not a mismatch",
+			target:    &model.Repository{FullName: "org/repo"},
+			collected: &model.Repository{ID: "100", FullName: "org/repo"},
+			want:      false,
+		},
+		{
+			name:      "nil collected is not a mismatch",
+			target:    &model.Repository{ID: "100", FullName: "org/repo"},
+			collected: nil,
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isIdentityMismatch(tt.target, tt.collected); got != tt.want {
+				t.Errorf("isIdentityMismatch() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
