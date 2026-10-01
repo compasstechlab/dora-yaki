@@ -473,6 +473,8 @@ export const api = {
 			const qs = params.toString();
 			return request<TeamMember[]>(`/team/members${qs ? `?${qs}` : ''}`);
 		},
+		getAllMemberStats: (repositories?: string[], start?: string, end?: string) =>
+			request<MemberStats[]>(`/team/stats?${buildDateRangeParams(repositories, start, end)}`),
 		getMemberStats: (id: string, repositories?: string[], start?: string, end?: string) =>
 			request<MemberStats>(
 				`/team/members/${id}/stats?${buildDateRangeParams(repositories, start, end)}`,

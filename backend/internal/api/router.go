@@ -172,6 +172,7 @@ func (r *Router) registerRoutes(h routeHandlers, jwtSecret []byte, jobAuthKey st
 
 	// Team endpoints (gated, cached).
 	r.mux.Handle("GET /api/team/members", gate(cached(http.HandlerFunc(h.team.ListMembers))))
+	r.mux.Handle("GET /api/team/stats", gate(cached(http.HandlerFunc(h.team.GetAllMemberStats))))
 	r.mux.Handle("GET /api/team/members/{id}/stats", gate(cached(http.HandlerFunc(h.team.GetMemberStats))))
 	r.mux.Handle("GET /api/team/members/{id}/pull-requests", gate(cached(http.HandlerFunc(h.team.GetMemberPullRequests))))
 	r.mux.Handle("GET /api/team/members/{id}/reviews", gate(cached(http.HandlerFunc(h.team.GetMemberReviews))))

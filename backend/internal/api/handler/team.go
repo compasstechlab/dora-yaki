@@ -191,6 +191,51 @@ func (h *TeamHandler) GetMemberStats(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, stats)
 }
 
+// GetAllMemberStats : returns stats for every team member in one response, applying the same bot filter as ListMembers.
+func (h *TeamHandler) GetAllMemberStats(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	startDate, endDate := parseDateRange(r)
+	bf := parseBotFilter(r)
+
+	repoIDs, err := h.getRepositoryIDs(r)
+	if err != nil {
+		h.logger.Error("failed to get repository IDs", "error", err)
+		http.Error(w, "failed to get repository IDs", http.StatusInternalServerError)
+		return
+	}
+
+	members, err := h.ds.ListTeamMembers(ctx)
+	if err != nil {
+		h.logger.Error("failed to list team members", "error", err)
+		http.Error(w, "failed to get member stats", http.StatusInternalServerError)
+		return
+	}
+	members = model.FilterTeamMembersByBot(members, h.getBotUsernames(ctx), bf.excludeBots, bf.botsOnly)
+
+	prs := h.collectPullRequests(ctx, repoIDs, startDate, endDate)
+	reviews := h.collectReviews(ctx, repoIDs, startDate, endDate)
+
+	respondJSON(w, http.StatusOK, calculateAllMemberStats(members, prs, reviews))
+}
+
+// calculateAllMemberStats : groups PRs and reviews by login once, then computes stats for each member in the given order.
+func calculateAllMemberStats(members []*model.TeamMember, prs []*model.PullRequest, reviews []*model.Review) []*MemberStats {
+	prsByAuthor := make(map[string][]*model.PullRequest)
+	for _, pr := range prs {
+		prsByAuthor[pr.Author] = append(prsByAuthor[pr.Author], pr)
+	}
+	reviewsByReviewer := make(map[string][]*model.Review)
+	for _, rv := range reviews {
+		reviewsByReviewer[rv.Reviewer] = append(reviewsByReviewer[rv.Reviewer], rv)
+	}
+
+	result := make([]*MemberStats, 0, len(members))
+	for _, m := range members {
+		result = append(result, calculateMemberStats(m, prsByAuthor[m.Login], reviewsByReviewer[m.Login]))
+	}
+	return result
+}
+
 func getMemberID(r *http.Request) string {
 	path := r.URL.Path
 	parts := strings.Split(path, "/")
