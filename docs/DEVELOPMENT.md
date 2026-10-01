@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.25+
+- Go 1.27+
 - Node.js 24+
 - pnpm
 - A GitHub OAuth App (see below)

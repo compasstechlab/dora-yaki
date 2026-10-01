@@ -1,18 +1,14 @@
 module github.com/compasstechlab/dora-yaki
 
-go 1.25.0
+go 1.27.1
 
 require (
 	cloud.google.com/go/compute/metadata v0.8.0
 	cloud.google.com/go/datastore v1.21.0
 	cloud.google.com/go/kms v1.22.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.9.2
+	github.com/google/go-github/v82 v82.0.0
 	golang.org/x/oauth2 v0.34.0
-)
-
-require (
-	cloud.google.com/go/iam v1.5.2 // indirect
-	cloud.google.com/go/longrunning v0.6.7 // indirect
 )
 
 require (
@@ -20,11 +16,12 @@ require (
 	cloud.google.com/go/auth v0.16.4 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/functions v1.19.6 // indirect
+	cloud.google.com/go/iam v1.5.2 // indirect
+	cloud.google.com/go/longrunning v0.6.7 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.15.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/google/go-github/v82 v82.0.0
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect

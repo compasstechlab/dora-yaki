@@ -65,7 +65,7 @@ GitHubリポジトリの登録と、1日〜1年の柔軟な期間でのデータ
 
 | レイヤー | 技術 |
 |---------|------|
-| バックエンド | Go 1.25, net/http (stdlib) |
+| バックエンド | Go 1.27, net/http (stdlib) |
 | フロントエンド | SvelteKit 2 (Svelte 5), Chart.js, date-fns |
 | データベース | Google Cloud Datastore |
 | インフラ | Google Cloud Functions / Cloud Run, Terraform |
