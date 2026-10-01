@@ -187,7 +187,8 @@ Cloud Run / Cloud Functions の IAM 呼び出し互換性のために使いま�
 
 GitHub OAuth によるユーザー認証が組み込まれました。`/api/auth/*` と
 `/api/cache/invalidate` を除くすべての `/api/*` エンドポイントは OAuth
-コールバックで発行されるセッションクッキーが必要です。
+コールバックで発行されるセッションクッキーが必要です (読み取り系ルートは
+個人用 API キーも受け付けます。後述)。
 
 本番環境で追加で検討すべき事項:
 
@@ -197,6 +198,16 @@ GitHub OAuth によるユーザー認証が組み込まれました。`/api/auth
 - `AUTH_JWT_SECRET` / `ENCRYPTION_KEY_BASE64` の定期ローテーション (または Cloud KMS の 90日自動ローテーションを利用)
 - GitHub OAuth App 設定の **Restrict to organization** で利用者を組織内に限定
 - バックエンドの前段に [Cloud Armor](https://cloud.google.com/armor) を配置して OAuth エンドポイントへの攻撃を緩和
+
+### 個人用 API キー
+
+ログインユーザーは `/api-keys` 画面から、CI・BI・bot 向けの個人用 API キー (`dyk_...`) を発行できます。
+
+- キーは**読み取り専用**です。受け付けるのはデータ取得の `GET` ルートのみで、書き込み系ルート・`/api/github/*`・`/api/api-keys` は引き続きセッションが必要です (API キーでは 401)。
+- バックエンドは `--allow-unauthenticated` でデプロイされているため、外部ツールはバックエンド URL (`VITE_API_BASE`、つまり `cloudfunctions.net` のエンドポイント) を直接呼び出します。将来バックエンドを IAM・Cloudflare Access・Cloud Armor のルールで閉じる場合は、API キーのクライアントも通れるようにする必要があります。
+- `APIKey` Kind に保存するのはシークレットの SHA-256 ハッシュのみで、平文は発行時に 1 回だけ表示されます。有効期限は最大 365 日で、所有者の GitHub トークンが存在しない・無効化済みの場合は使えなくなります。
+- キーが漏洩した場合は `/api-keys` から失効してください。失効は即時に反映されます。プレフィックス `dyk_` によりシークレットスキャナで検出しやすくしています。
+- 新しい環境変数・Secret・Terraform リソース・Datastore 複合インデックスの追加は不要です。
 
 ## 旧 GITHUB_TOKEN 構成からの移行
 
