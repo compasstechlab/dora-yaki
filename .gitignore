@@ -35,6 +35,7 @@ go.work.sum
 .playwright-mcp/
 
 # Backend
+backend/bin/
 backend/tmp/
 backend/build-errors.log
 
