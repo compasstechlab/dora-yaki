@@ -8,6 +8,7 @@ import (
 
 	"github.com/compasstechlab/dora-yaki/internal/api/handler"
 	"github.com/compasstechlab/dora-yaki/internal/api/middleware"
+	"github.com/compasstechlab/dora-yaki/internal/apikey"
 	"github.com/compasstechlab/dora-yaki/internal/auth"
 	"github.com/compasstechlab/dora-yaki/internal/config"
 	"github.com/compasstechlab/dora-yaki/internal/crypto"
@@ -61,6 +62,8 @@ func NewRouterWithDeps(deps RouterDeps) *Router {
 	botUserHandler := handler.NewBotUserHandler(deps.DS, deps.Logger)
 	jobHandler := handler.NewJobHandler(deps.DS, deps.TokenPool, deps.Logger, cache, deps.Config)
 	permissionCheckHandler := handler.NewPermissionCheckHandler(deps.DS, deps.ClientFactory, deps.Logger)
+	apiKeyHandler := handler.NewAPIKeyHandler(deps.DS, deps.Logger)
+	apiKeyAuth := apikey.NewAuthenticator(deps.DS, deps.Logger)
 	authHandler := handler.NewAuthHandler(
 		deps.DS,
 		deps.Encryptor,
@@ -82,7 +85,8 @@ func NewRouterWithDeps(deps RouterDeps) *Router {
 		job:             jobHandler,
 		auth:            authHandler,
 		permissionCheck: permissionCheckHandler,
-	}, deps.JWTSecret, deps.Config.JobAuthKey)
+		apiKey:          apiKeyHandler,
+	}, deps.JWTSecret, apiKeyAuth, deps.Config.JobAuthKey)
 
 	return r
 }
@@ -108,11 +112,14 @@ type routeHandlers struct {
 	job             *handler.JobHandler
 	auth            *handler.AuthHandler
 	permissionCheck *handler.PermissionCheckHandler
+	apiKey          *handler.APIKeyHandler
 }
 
-func (r *Router) registerRoutes(h routeHandlers, jwtSecret []byte, jobAuthKey string) {
+func (r *Router) registerRoutes(h routeHandlers, jwtSecret []byte, apiKeyVerifier auth.APIKeyVerifier, jobAuthKey string) {
 	cached := r.cache.Middleware()
 	gate := auth.RequireAuth(jwtSecret)
+	// [sec] readGate also accepts API keys; mount only read-only (GET) routes on it.
+	readGate := auth.RequireAuthOrAPIKey(jwtSecret, apiKeyVerifier)
 	jobGate := middleware.JobAuth(jobAuthKey)
 
 	// Health check (always public).
@@ -134,48 +141,53 @@ func (r *Router) registerRoutes(h routeHandlers, jwtSecret []byte, jobAuthKey st
 	r.mux.HandleFunc("POST /api/auth/logout", h.auth.Logout)
 	r.mux.HandleFunc("GET /api/auth/me", h.auth.Me)
 
-	// Repository endpoints (gated).
-	r.mux.Handle("GET /api/repositories", gate(cached(http.HandlerFunc(h.repo.List))))
+	// Repository endpoints (reads accept API keys).
+	r.mux.Handle("GET /api/repositories", readGate(cached(http.HandlerFunc(h.repo.List))))
 	r.mux.Handle("POST /api/repositories", gate(http.HandlerFunc(h.repo.Add)))
-	r.mux.Handle("GET /api/repositories/{id}", gate(http.HandlerFunc(h.repo.Get)))
+	r.mux.Handle("GET /api/repositories/{id}", readGate(http.HandlerFunc(h.repo.Get)))
 	r.mux.Handle("DELETE /api/repositories/{id}", gate(http.HandlerFunc(h.repo.Delete)))
 	r.mux.Handle("POST /api/repositories/batch", gate(http.HandlerFunc(h.repo.BatchAdd)))
 	r.mux.Handle("POST /api/repositories/{id}/sync", gate(http.HandlerFunc(h.repo.Sync)))
-	r.mux.Handle("GET /api/repositories/date-ranges", gate(cached(http.HandlerFunc(h.repo.DateRanges))))
+	r.mux.Handle("GET /api/repositories/date-ranges", readGate(cached(http.HandlerFunc(h.repo.DateRanges))))
 
 	// GitHub proxy endpoints (gated).
 	r.mux.Handle("GET /api/github/me", gate(http.HandlerFunc(h.github.GetMe)))
 	r.mux.Handle("GET /api/github/owners/{owner}/repos", gate(http.HandlerFunc(h.github.ListOwnerRepos)))
 
-	// Metrics endpoints (gated, cached).
-	r.mux.Handle("GET /api/metrics/cycle-time", gate(cached(http.HandlerFunc(h.metrics.CycleTime))))
-	r.mux.Handle("GET /api/metrics/reviews", gate(cached(http.HandlerFunc(h.metrics.Reviews))))
-	r.mux.Handle("GET /api/metrics/dora", gate(cached(http.HandlerFunc(h.metrics.DORA))))
-	r.mux.Handle("GET /api/metrics/productivity-score", gate(cached(http.HandlerFunc(h.metrics.ProductivityScore))))
-	r.mux.Handle("GET /api/metrics/daily", gate(cached(http.HandlerFunc(h.metrics.DailyMetrics))))
-	r.mux.Handle("GET /api/metrics/pull-requests", gate(cached(http.HandlerFunc(h.metrics.PullRequests))))
+	// Metrics endpoints (API keys accepted, cached).
+	r.mux.Handle("GET /api/metrics/cycle-time", readGate(cached(http.HandlerFunc(h.metrics.CycleTime))))
+	r.mux.Handle("GET /api/metrics/reviews", readGate(cached(http.HandlerFunc(h.metrics.Reviews))))
+	r.mux.Handle("GET /api/metrics/dora", readGate(cached(http.HandlerFunc(h.metrics.DORA))))
+	r.mux.Handle("GET /api/metrics/productivity-score", readGate(cached(http.HandlerFunc(h.metrics.ProductivityScore))))
+	r.mux.Handle("GET /api/metrics/daily", readGate(cached(http.HandlerFunc(h.metrics.DailyMetrics))))
+	r.mux.Handle("GET /api/metrics/pull-requests", readGate(cached(http.HandlerFunc(h.metrics.PullRequests))))
 
-	// Sprint endpoints (gated).
-	r.mux.Handle("GET /api/sprints", gate(http.HandlerFunc(h.sprint.List)))
+	// Sprint endpoints (reads accept API keys).
+	r.mux.Handle("GET /api/sprints", readGate(http.HandlerFunc(h.sprint.List)))
 	r.mux.Handle("POST /api/sprints", gate(http.HandlerFunc(h.sprint.Create)))
-	r.mux.Handle("GET /api/sprints/{id}", gate(http.HandlerFunc(h.sprint.Get)))
-	r.mux.Handle("GET /api/sprints/{id}/performance", gate(http.HandlerFunc(h.sprint.GetPerformance)))
+	r.mux.Handle("GET /api/sprints/{id}", readGate(http.HandlerFunc(h.sprint.Get)))
+	r.mux.Handle("GET /api/sprints/{id}/performance", readGate(http.HandlerFunc(h.sprint.GetPerformance)))
 
-	// Bot user endpoints (gated).
-	r.mux.Handle("GET /api/bot-users", gate(http.HandlerFunc(h.botUser.List)))
+	// Bot user endpoints (reads accept API keys).
+	r.mux.Handle("GET /api/bot-users", readGate(http.HandlerFunc(h.botUser.List)))
 	r.mux.Handle("POST /api/bot-users", gate(http.HandlerFunc(h.botUser.Add)))
 	r.mux.Handle("DELETE /api/bot-users", gate(http.HandlerFunc(h.botUser.Delete)))
+
+	// API key management (session only: an API key cannot manage keys).
+	r.mux.Handle("GET /api/api-keys", gate(http.HandlerFunc(h.apiKey.List)))
+	r.mux.Handle("POST /api/api-keys", gate(http.HandlerFunc(h.apiKey.Create)))
+	r.mux.Handle("DELETE /api/api-keys/{id}", gate(http.HandlerFunc(h.apiKey.Revoke)))
 
 	// Job endpoints (scheduler/shared-key gated).
 	r.mux.Handle("PUT /api/job/sync", jobGate(http.HandlerFunc(h.job.Sync)))
 	r.mux.Handle("PUT /api/job/permission-check", jobGate(http.HandlerFunc(h.permissionCheck.Run)))
 
-	// Team endpoints (gated, cached).
-	r.mux.Handle("GET /api/team/members", gate(cached(http.HandlerFunc(h.team.ListMembers))))
-	r.mux.Handle("GET /api/team/stats", gate(cached(http.HandlerFunc(h.team.GetAllMemberStats))))
-	r.mux.Handle("GET /api/team/members/{id}/stats", gate(cached(http.HandlerFunc(h.team.GetMemberStats))))
-	r.mux.Handle("GET /api/team/members/{id}/pull-requests", gate(cached(http.HandlerFunc(h.team.GetMemberPullRequests))))
-	r.mux.Handle("GET /api/team/members/{id}/reviews", gate(cached(http.HandlerFunc(h.team.GetMemberReviews))))
+	// Team endpoints (API keys accepted, cached).
+	r.mux.Handle("GET /api/team/members", readGate(cached(http.HandlerFunc(h.team.ListMembers))))
+	r.mux.Handle("GET /api/team/stats", readGate(cached(http.HandlerFunc(h.team.GetAllMemberStats))))
+	r.mux.Handle("GET /api/team/members/{id}/stats", readGate(cached(http.HandlerFunc(h.team.GetMemberStats))))
+	r.mux.Handle("GET /api/team/members/{id}/pull-requests", readGate(cached(http.HandlerFunc(h.team.GetMemberPullRequests))))
+	r.mux.Handle("GET /api/team/members/{id}/reviews", readGate(cached(http.HandlerFunc(h.team.GetMemberReviews))))
 }
 
 // ServeHTTP implements http.Handler

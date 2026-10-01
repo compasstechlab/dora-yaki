@@ -193,7 +193,8 @@ token keeps Cloud Run / Cloud Functions invocation compatible with IAM checks.
 
 User authentication is now built in via GitHub OAuth. Every `/api/*`
 endpoint (except `/api/auth/*` and `/api/cache/invalidate`) requires a
-session cookie issued by the OAuth callback.
+session cookie issued by the OAuth callback (read routes also accept personal
+API keys, see below).
 
 Additional production hardening you should still consider:
 
@@ -203,6 +204,16 @@ Additional production hardening you should still consider:
 - Rotate `AUTH_JWT_SECRET` and `ENCRYPTION_KEY_BASE64` periodically (or use Cloud KMS with automatic 90-day rotation).
 - Limit who can install the OAuth App by setting **Restrict to organization** in GitHub OAuth App settings.
 - Front the backend with [Cloud Armor](https://cloud.google.com/armor) to mitigate abuse of the public OAuth endpoints.
+
+### Personal API Keys
+
+Logged-in users can issue personal API keys (`dyk_...`) from the `/api-keys` page for CI, BI or bots.
+
+- Keys are **read-only**: accepted on `GET` data routes only. Write routes, `/api/github/*` and `/api/api-keys` still require a session (401 otherwise).
+- External tools call the backend URL directly (`VITE_API_BASE`, i.e. the `cloudfunctions.net` endpoint), because the backend is deployed with `--allow-unauthenticated`. If you later put the backend behind IAM, Cloudflare Access or Cloud Armor rules, API key clients must be allowed through as well.
+- Only the SHA-256 hash of the secret is stored in the `APIKey` kind; the plaintext is shown once at creation. Keys expire after at most 365 days and stop working when the owner's GitHub token is missing or marked invalid.
+- If a key leaks, revoke it from `/api-keys`; revocation takes effect immediately. The `dyk_` prefix makes keys easy to catch with secret scanners.
+- No new environment variables, secrets, Terraform resources or Datastore composite indexes are required.
 
 ## Migration from a Single GITHUB_TOKEN
 

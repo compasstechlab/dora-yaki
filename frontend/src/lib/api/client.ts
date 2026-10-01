@@ -1,6 +1,6 @@
 import { addFlash } from '$stores/flash';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+export const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 interface RequestOptions {
 	method?: string;
@@ -318,6 +318,22 @@ export interface BotUser {
 	createdAt: string;
 }
 
+export interface APIKey {
+	id: string;
+	name: string;
+	/** Non-secret display prefix ("dyk_<id>") */
+	prefix: string;
+	createdAt: string;
+	expiresAt?: string;
+	lastUsedAt?: string;
+}
+
+export interface CreateAPIKeyResponse {
+	apiKey: APIKey;
+	/** Plaintext key, returned only once at creation */
+	token: string;
+}
+
 /** Bot filtering options */
 export interface BotFilterOptions {
 	excludeBots?: boolean;
@@ -462,6 +478,18 @@ export const api = {
 			request<BotUser>('/bot-users', { method: 'POST', body: { username } }),
 		delete: (username: string) =>
 			request<void>(`/bot-users?username=${encodeURIComponent(username)}`, { method: 'DELETE' }),
+	},
+
+	// API Keys (session only)
+	apiKeys: {
+		list: () => request<APIKey[]>('/api-keys'),
+		create: (name: string, expiresInDays: number) =>
+			request<CreateAPIKeyResponse>('/api-keys', {
+				method: 'POST',
+				body: { name, expiresInDays },
+			}),
+		revoke: (id: string) =>
+			request<void>(`/api-keys/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 	},
 
 	// Team

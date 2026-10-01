@@ -58,6 +58,7 @@ Identify and manage bot accounts. View bot-specific PR and review metrics separa
 - **Team Analytics** — Per-member statistics with daily/weekly charts and PR/review history
 - **Bot User Management** — Exclude bot accounts from metrics or view bot-only metrics
 - **Multi-language Support** — 8 languages (ja, en, zh-TW, zh-CN, ko, es, fr, de) with browser auto-detection
+- **Personal API Keys** — Read-only, revocable `dyk_` keys for fetching metrics from CI, BI or bots
 - **GitHub OAuth Login** — Per-user authentication; OAuth tokens stored encrypted in Datastore (AES-256-GCM or Cloud KMS); per-repository ACL refreshed daily
 
 ## Tech Stack

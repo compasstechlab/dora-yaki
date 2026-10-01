@@ -9,7 +9,7 @@
 
 ## GitHub OAuth App Setup
 
-dora-yaki uses GitHub OAuth for user login; every API call is gated behind a session cookie.
+dora-yaki uses GitHub OAuth for user login; every API call is gated behind a session cookie (read endpoints also accept personal API keys).
 A standalone GitHub Personal Access Token is **not** required.
 
 1. Open <https://github.com/settings/developers> -> **OAuth Apps** -> **New OAuth App**.
@@ -150,6 +150,7 @@ api/handler/                HTTP handlers (request/response)
 ├── repository.go           Repository CRUD & sync (filtered by RepositoryAccess)
 ├── team.go                 Team member stats
 ├── bot_user.go             Bot user management
+├── api_key.go              Personal API key issue/list/revoke
 ├── github.go               GitHub API proxy (per-user)
 ├── sprint.go               Sprint management
 ├── job.go                  Repository sync job
@@ -159,9 +160,15 @@ api/handler/                HTTP handlers (request/response)
 auth/                       Session cookies + GitHub OAuth flow
 ├── session.go              HMAC-SHA256 cookie sign/verify
 ├── cookie.go               Cookie helpers
-├── middleware.go           RequireAuth gate
+├── middleware.go           RequireAuth (session) / RequireAuthOrAPIKey (read routes) gates
+├── apikey.go               APIKeyVerifier interface + sentinel errors
 ├── oauth_github.go         Authorize URL, code exchange, refresh
 └── state.go                Signed OAuth `state` (CSRF + return_to)
+    │
+    ▼
+apikey/                     Personal API keys (`dyk_<id>_<secret>`)
+├── apikey.go               Generate / Parse / SHA-256 hash + constant-time compare
+└── authenticator.go        VerifyAPIKey (expiry, owner token validity, LastUsedAt)
     │
     ▼
 crypto/                     Token-at-rest encryption
@@ -179,6 +186,7 @@ datastore/                  Cloud Datastore persistence
 ├── client.go               Core kinds + lock
 ├── users.go                User entity
 ├── user_tokens.go          UserGitHubToken (encrypted access/refresh)
+├── api_keys.go             APIKey (SHA-256 hash only)
 └── repository_access.go    RepositoryAccess (per-user ACL + token rotation pool)
 github/                     GitHub data collection
 ├── client.go               API client wrapper
@@ -191,6 +199,7 @@ github/                     GitHub data collection
 ### Key Design Decisions
 
 - **GitHub OAuth login required**: every `/api/*` request (except `/api/auth/*` and ops endpoints) is gated. There is no shared service token.
+- **Personal read-only API keys**: users issue `dyk_` keys from `/api-keys` for external tools. Only the SHA-256 hash is stored; keys are accepted on read (GET) routes only, expire within 365 days, and stop working once the owner's GitHub token is missing or marked invalid.
 - **Per-user encrypted GitHub tokens**: `UserGitHubToken` stores AES-256-GCM (or KMS-encrypted) `access_token` + `refresh_token`; access tokens auto-refresh ~5 min before expiry.
 - **Repository ACL with daily refresh**: a user's view of a repository is gated by `RepositoryAccess.CanAccess`, refreshed by `PUT /api/job/permission-check` (run daily).
 - **Sync token rotation**: per-repo candidate pool ordered LRU; on 401/403 the offending user's token is marked invalid and the next candidate retries.
@@ -233,6 +242,14 @@ Lightweight i18n built on Svelte writable/derived stores (no external library):
 
 All `/api/*` endpoints except `/api/auth/*` and `/api/cache/invalidate`
 require a valid session cookie issued by `GET /api/auth/github/callback`.
+
+Read endpoints (repositories, metrics, sprints, bot users and team `GET` routes) also accept a
+personal API key as `Authorization: Bearer dyk_...`. Write endpoints, `/api/github/*` and
+`/api/api-keys` accept sessions only; an API key there gets 401.
+
+```bash
+curl -H "Authorization: Bearer dyk_..." "https://<backend>/api/metrics/dora?repository=<id>&start=2026-09-01&end=2026-09-30"
+```
 
 ### Health
 - `GET /health` - Health check
@@ -278,6 +295,11 @@ require a valid session cookie issued by `GET /api/auth/github/callback`.
 - `POST /api/bot-users` - Add bot user
 - `DELETE /api/bot-users` - Delete bot user
 
+### API Keys (session only)
+- `GET /api/api-keys` - List the caller's API keys (newest first; the secret is never returned)
+- `POST /api/api-keys` - Issue a key: `{name, expiresInDays}` (`name` 1-64 chars; `expiresInDays` 30/90/180/365, default 90) -> 201 `{apiKey, token}`. `token` is shown only once. 409 when the caller already has 3 keys (expired keys count)
+- `DELETE /api/api-keys/{id}` - Revoke (delete) one of the caller's keys -> 204; 404 for unknown or others' keys
+
 ### Team
 - `GET /api/team/members` - List team members
 - `GET /api/team/stats` - Statistics for all team members
@@ -297,14 +319,15 @@ dora-yaki/
 │   ├── cmd/httpserver/           # Entry point
 │   ├── internal/
 │   │   ├── api/
-│   │   │   ├── handler/         # HTTP handlers (auth, metrics, repository, team, job, permission_check)
+│   │   │   ├── handler/         # HTTP handlers (auth, metrics, repository, team, job, permission_check, api_key)
 │   │   │   ├── middleware/       # CORS, logger, cache
 │   │   │   └── router.go        # Route definitions
-│   │   ├── auth/                # OAuth flow + session cookie + RequireAuth middleware
+│   │   ├── apikey/              # Personal API key generation & verification
+│   │   ├── auth/                # OAuth flow + session cookie + RequireAuth / RequireAuthOrAPIKey middleware
 │   │   ├── config/              # Configuration
 │   │   ├── crypto/              # Encryptor (AES-GCM / Cloud KMS)
 │   │   ├── datastore/           # Cloud Datastore client
-│   │   ├── domain/model/        # Domain models (incl. User, UserGitHubToken, RepositoryAccess)
+│   │   ├── domain/model/        # Domain models (incl. User, UserGitHubToken, RepositoryAccess, APIKey)
 │   │   ├── github/              # GitHub client + collector + per-user factory + rotation pool
 │   │   ├── metrics/             # Calculator & aggregator
 │   │   └── timeutil/            # Timezone offset handling

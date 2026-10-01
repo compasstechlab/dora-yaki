@@ -31,6 +31,7 @@ const (
 	KindUser             = "User"
 	KindUserGitHubToken  = "UserGitHubToken" //nolint:gosec // datastore kind name, not a credential
 	KindRepositoryAccess = "RepositoryAccess"
+	KindAPIKey           = "APIKey"
 )
 
 // NewClient creates a new Datastore client

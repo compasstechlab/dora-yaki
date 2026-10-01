@@ -42,6 +42,7 @@ let navItems = $derived([
 	{ path: '/repo', label: $t('nav.repo'), icon: '📁' },
 	{ path: '/team', label: $t('nav.team'), icon: '👥' },
 	{ path: '/bots', label: $t('nav.bots'), icon: '🤖' },
+	{ path: '/api-keys', label: $t('nav.apiKeys'), icon: '🔑' },
 	{ path: '/repositories', label: $t('nav.repositories'), icon: '⚙️' },
 ]);
 
