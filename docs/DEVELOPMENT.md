@@ -280,6 +280,7 @@ require a valid session cookie issued by `GET /api/auth/github/callback`.
 
 ### Team
 - `GET /api/team/members` - List team members
+- `GET /api/team/stats` - Statistics for all team members
 - `GET /api/team/members/{id}/stats` - Member statistics
 - `GET /api/team/members/{id}/pull-requests` - Member pull requests
 - `GET /api/team/members/{id}/reviews` - Member reviews

@@ -1,19 +1,22 @@
 <script lang="ts">
-import { onMount } from 'svelte';
-import { api, type FileExtensionMetrics, type MemberStats, type TeamMember } from '$api/client';
+import { api, type FileExtensionMetrics, type MemberStats } from '$api/client';
 import { browser } from '$app/environment';
 import { t } from '$i18n';
 import { isCodeExtension, isConfigExtension } from '$lib/utils/extensions';
 import { dateRange, formatHours } from '$stores/metrics';
 import { selectedRepositories } from '$stores/repositories';
 
-let members = $state<TeamMember[]>([]);
-let memberStats = $state<Record<string, MemberStats>>({});
+const SKELETON_CARD_COUNT = 6;
+
+// null until the first response arrives; kept during reloads so the grid does not flash.
+let memberStats = $state<MemberStats[] | null>(null);
 let isLoading = $state(false);
-let membersLoaded = $state(false);
+let loadError = $state<string | null>(null);
 let hideInactive = $state(true);
 let codeExtOnly = $state(true);
 let configExtOnly = $state(false);
+// Ignores responses from superseded requests when filters change quickly.
+let requestSeq = 0;
 
 function isActiveMember(stats: MemberStats): boolean {
 	return (
@@ -25,21 +28,14 @@ function isActiveMember(stats: MemberStats): boolean {
 	);
 }
 
-let statsLoaded = $derived(Object.keys(memberStats).length >= members.length && members.length > 0);
+let allStats = $derived(memberStats ?? []);
 
-let visibleMembers = $derived(
-	members.filter((m) => {
-		if (!hideInactive) return true;
-		const stats = memberStats[m.id];
-		if (!stats) return !statsLoaded;
-		return isActiveMember(stats);
-	}),
-);
+let visibleStats = $derived(allStats.filter((s) => !hideInactive || isActiveMember(s)));
 
 // Aggregate file extension stats across all team members
 let teamFileExtStats = $derived.by(() => {
 	const map = new Map<string, FileExtensionMetrics>();
-	for (const stats of Object.values(memberStats)) {
+	for (const stats of allStats) {
 		if (!stats.byFileExtension) continue;
 		for (const ext of stats.byFileExtension) {
 			const existing = map.get(ext.extension);
@@ -56,42 +52,25 @@ let teamFileExtStats = $derived.by(() => {
 	return [...map.values()].sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions));
 });
 
-onMount(async () => {
-	await loadMembers();
-	membersLoaded = true;
-});
-
-async function loadMembers() {
-	try {
-		members = await api.team.listMembers();
-	} catch (error) {
-		console.error('Failed to load team members:', error);
-	}
-}
-
-async function loadAllMemberStats() {
-	if (members.length === 0) return;
+async function loadAllMemberStats(repos: string[] | undefined, start: string, end: string) {
+	const seq = ++requestSeq;
 	isLoading = true;
-	// Clear old stats on reload and show new data incrementally
-	memberStats = {};
-	const repos = $selectedRepositories.length > 0 ? $selectedRepositories : undefined;
-	await Promise.all(
-		members.map(async (m) => {
-			try {
-				const stats = await api.team.getMemberStats(m.id, repos, $dateRange.start, $dateRange.end);
-				memberStats[m.id] = stats;
-			} catch (error) {
-				console.error('Failed to load member stats:', error);
-			}
-		}),
-	);
-	isLoading = false;
+	loadError = null;
+	try {
+		const stats = await api.team.getAllMemberStats(repos, start, end);
+		if (seq === requestSeq) memberStats = stats;
+	} catch (error) {
+		console.error('Failed to load member stats:', error);
+		if (seq === requestSeq) loadError = $t('memberDetail.loadError');
+	} finally {
+		if (seq === requestSeq) isLoading = false;
+	}
 }
 
 $effect(() => {
-	if (browser && membersLoaded && $selectedRepositories && $dateRange) {
-		loadAllMemberStats();
-	}
+	if (!browser) return;
+	const repos = $selectedRepositories.length > 0 ? $selectedRepositories : undefined;
+	loadAllMemberStats(repos, $dateRange.start, $dateRange.end);
 });
 </script>
 
@@ -102,35 +81,56 @@ $effect(() => {
 <div class="page">
 	<header class="page-header">
 		<h1>{$t('team.title')}</h1>
+		{#if isLoading && memberStats !== null}
+			<div class="loading-inline" role="status">
+				<div class="spinner"></div>
+				<span>{$t('common.loadingStats')}</span>
+			</div>
+		{/if}
 		<label class="toggle-inactive">
 			<input type="checkbox" bind:checked={hideInactive}>
 			<span>{$t('common.activeOnly')}</span>
 		</label>
 	</header>
 
-	{#if members.length === 0}
+	{#if memberStats === null}
+		{#if loadError}
+			<div class="empty-state">
+				<p>{loadError}</p>
+			</div>
+		{:else}
+			<div class="team-grid" aria-busy="true" aria-label={$t('common.loadingStats')}>
+				{#each Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => i) as i (i)}
+					<div class="member-card" aria-hidden="true">
+						<div class="member-header">
+							<div class="skeleton skeleton-avatar"></div>
+							<div class="member-info">
+								<div class="skeleton skeleton-line skeleton-line-name"></div>
+								<div class="skeleton skeleton-line skeleton-line-login"></div>
+							</div>
+						</div>
+						<div class="skeleton skeleton-stats"></div>
+						<div class="skeleton skeleton-line skeleton-line-code"></div>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	{:else if allStats.length === 0}
 		<div class="empty-state">
 			<p>{$t('team.noMembers')}</p>
 		</div>
 	{:else}
-		{#if isLoading}
-			<div class="loading-bar">
-				<div class="spinner"></div>
-				<span>{$t('common.loadingStats')}</span>
-				{#if members.length > 0}
-					<span class="loading-progress"
-						>({Object.keys(memberStats).length} / {members.length})</span
-					>
-				{/if}
-			</div>
+		{#if loadError}
+			<div class="error-banner" role="alert">{loadError}</div>
 		{/if}
-		{#if statsLoaded && visibleMembers.length === 0 && hideInactive}
+		{#if visibleStats.length === 0 && hideInactive}
 			<div class="empty-state">
 				<p>{$t('team.noActiveMembers')}</p>
 			</div>
 		{/if}
-		<div class="team-grid">
-			{#each visibleMembers as member}
+		<div class="team-grid" class:is-stale={isLoading} aria-busy={isLoading}>
+			{#each visibleStats as stats (stats.member.id)}
+				{@const member = stats.member}
 				<a href="/team/{member.id}" class="member-card member-card-link">
 					<div class="member-header">
 						{#if member.avatarUrl}
@@ -144,52 +144,40 @@ $effect(() => {
 						</div>
 					</div>
 
-					{#if memberStats[member.id]}
-						<div class="member-stats">
-							<div class="stat">
-								<span class="stat-value">{memberStats[member.id].prsAuthored}</span>
-								<span class="stat-label">{$t('team.prsCreated')}</span>
-							</div>
-							<div class="stat">
-								<span class="stat-value">{memberStats[member.id].prsMerged}</span>
-								<span class="stat-label">{$t('team.merged')}</span>
-							</div>
-							<div class="stat">
-								<span class="stat-value">{memberStats[member.id].reviewsGiven}</span>
-								<span class="stat-label">{$t('team.reviews')}</span>
-							</div>
-							<div class="stat">
-								<span class="stat-value">
-									{memberStats[member.id].avgCycleTime > 0
-                    ? formatHours(memberStats[member.id].avgCycleTime)
-                    : "-"}
-								</span>
-								<span class="stat-label">{$t('team.avgCT')}</span>
-							</div>
+					<div class="member-stats">
+						<div class="stat">
+							<span class="stat-value">{stats.prsAuthored}</span>
+							<span class="stat-label">{$t('team.prsCreated')}</span>
 						</div>
-
-						<div class="code-stats">
-							<span class="additions"
-								>+{memberStats[member.id].totalAdditions.toLocaleString()}</span
-							>
-							<span class="deletions"
-								>-{memberStats[member.id].totalDeletions.toLocaleString()}</span
-							>
+						<div class="stat">
+							<span class="stat-value">{stats.prsMerged}</span>
+							<span class="stat-label">{$t('team.merged')}</span>
 						</div>
+						<div class="stat">
+							<span class="stat-value">{stats.reviewsGiven}</span>
+							<span class="stat-label">{$t('team.reviews')}</span>
+						</div>
+						<div class="stat">
+							<span class="stat-value">
+								{stats.avgCycleTime > 0 ? formatHours(stats.avgCycleTime) : "-"}
+							</span>
+							<span class="stat-label">{$t('team.avgCT')}</span>
+						</div>
+					</div>
 
-						{#if memberStats[member.id].byFileExtension && memberStats[member.id].byFileExtension!.length > 0}
-							<div class="ext-stats">
-								{#each memberStats[member.id].byFileExtension!.slice(0, 3) as ext}
-									<span class="ext-tag">
-										<code>{ext.extension}</code>
-										<span class="ext-additions">+{ext.additions.toLocaleString()}</span>
-										<span class="ext-deletions">-{ext.deletions.toLocaleString()}</span>
-									</span>
-								{/each}
-							</div>
-						{/if}
-					{:else}
-						<div class="loading-stats">{$t('common.loadingStats')}</div>
+					<div class="code-stats">
+						<span class="additions">+{stats.totalAdditions.toLocaleString()}</span>
+						<span class="deletions">-{stats.totalDeletions.toLocaleString()}</span>
+					</div>
+
+					{#if stats.byFileExtension && stats.byFileExtension.length > 0}
+						<div class="ext-stats">
+							{#each stats.byFileExtension.slice(0, 3) as ext}<span class="ext-tag">
+								<code>{ext.extension}</code>
+								<span class="ext-additions">+{ext.additions.toLocaleString()}</span>
+								<span class="ext-deletions">-{ext.deletions.toLocaleString()}</span>
+							</span>{/each}
+						</div>
 					{/if}
 				</a>
 			{/each}
@@ -201,36 +189,24 @@ $effect(() => {
 			<div class="summary-grid">
 				<div class="summary-card">
 					<h3>{$t('team.totalPRs')}</h3>
-					<div class="summary-value">
-						{Object.values(memberStats).reduce(
-              (sum, s) => sum + s.prsAuthored,
-              0,
-            )}
-					</div>
+					<div class="summary-value">{allStats.reduce((sum, s) => sum + s.prsAuthored, 0)}</div>
 				</div>
 				<div class="summary-card">
 					<h3>{$t('team.totalReviews')}</h3>
-					<div class="summary-value">
-						{Object.values(memberStats).reduce(
-              (sum, s) => sum + s.reviewsGiven,
-              0,
-            )}
-					</div>
+					<div class="summary-value">{allStats.reduce((sum, s) => sum + s.reviewsGiven, 0)}</div>
 				</div>
 				<div class="summary-card">
 					<h3>{$t('team.activeMembers')}</h3>
 					<div class="summary-value">
-						{Object.values(memberStats).filter(
-              (s) => s.prsAuthored > 0 || s.reviewsGiven > 0,
-            ).length}
+						{allStats.filter((s) => s.prsAuthored > 0 || s.reviewsGiven > 0).length}
 					</div>
 				</div>
 				<div class="summary-card">
 					<h3>{$t('team.totalCodeChanges')}</h3>
 					<div class="summary-value">
-						{Object.values(memberStats)
-              .reduce((sum, s) => sum + s.totalAdditions + s.totalDeletions, 0)
-              .toLocaleString()}
+						{allStats
+							.reduce((sum, s) => sum + s.totalAdditions + s.totalDeletions, 0)
+							.toLocaleString()}
 						lines
 					</div>
 				</div>
@@ -360,22 +336,17 @@ $effect(() => {
 	white-space: nowrap;
 }
 
-.loading-bar {
+.loading-inline {
 	display: flex;
 	align-items: center;
-	gap: 0.75rem;
-	padding: 0.75rem 1.25rem;
-	margin-bottom: 1rem;
-	background: var(--color-bg-card);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-lg);
-	font-size: 0.875rem;
+	gap: 0.5rem;
+	font-size: 0.8125rem;
 	color: var(--color-text-muted);
 }
 
 .spinner {
-	width: 20px;
-	height: 20px;
+	width: 16px;
+	height: 16px;
 	border: 2px solid var(--color-border);
 	border-top-color: var(--color-primary);
 	border-radius: 50%;
@@ -389,8 +360,13 @@ $effect(() => {
 	}
 }
 
-.loading-progress {
-	font-variant-numeric: tabular-nums;
+.error-banner {
+	padding: 0.75rem 1.25rem;
+	margin-bottom: 1rem;
+	border: 1px solid #ef4444;
+	border-radius: var(--radius-lg);
+	color: #ef4444;
+	font-size: 0.875rem;
 }
 
 .empty-state {
@@ -543,11 +519,58 @@ $effect(() => {
 	color: #ef4444;
 }
 
-.loading-stats {
-	text-align: center;
-	padding: 1rem;
-	color: var(--color-text-muted);
-	font-size: 0.875rem;
+.team-grid.is-stale {
+	opacity: 0.5;
+	pointer-events: none;
+	transition: opacity 0.15s;
+}
+
+.skeleton {
+	background: var(--color-border);
+	border-radius: 4px;
+	animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-avatar {
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.skeleton-line {
+	height: 0.75rem;
+}
+
+.skeleton-line-name {
+	width: 60%;
+	margin-bottom: 0.5rem;
+}
+
+.skeleton-line-login {
+	width: 40%;
+}
+
+.skeleton-stats {
+	height: 2.75rem;
+	margin-bottom: 1rem;
+}
+
+.skeleton-line-code {
+	width: 40%;
+	margin: 0 auto;
+}
+
+@keyframes pulse {
+	50% {
+		opacity: 0.4;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.skeleton {
+		animation: none;
+	}
 }
 
 .section {
