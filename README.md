@@ -65,7 +65,7 @@ Identify and manage bot accounts. View bot-specific PR and review metrics separa
 
 | Layer | Technology |
 |-------|------------|
-| Backend | Go 1.25, net/http (stdlib) |
+| Backend | Go 1.27, net/http (stdlib) |
 | Frontend | SvelteKit 2 (Svelte 5), Chart.js, date-fns |
 | Database | Google Cloud Datastore |
 | Infrastructure | Google Cloud Functions / Cloud Run, Terraform |

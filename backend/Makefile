@@ -45,7 +45,7 @@ deploy:
 	  --gen2 \
 	  --project $(project) \
 	  --region $(region) \
-	  --runtime go125 \
+	  --runtime go127 \
 	  --source ./ \
 	  --entry-point RunHTTPServer \
 	  --trigger-http \
@@ -74,7 +74,7 @@ __confirm-deploy:
 	@echo "  GCP_PROJECT_ID=$(project)"
 	@echo "  GCP_REGION=$(region)"
 	@echo "  BACKEND_FUNCTION_NAME=$(backend_function_name)"
-	@echo "  RUNTIME=go125"
+	@echo "  RUNTIME=go127"
 	@echo "  ENTRY_POINT=RunHTTPServer"
 	@echo "  TIMEOUT=540s"
 	@echo "  ENVIRONMENT=production"
