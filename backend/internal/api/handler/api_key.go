@@ -145,7 +145,7 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("api key created", "apiKeyID", id, "userID", claims.UserID)
-	// [sec] The plaintext token is returned only in this response; only its hash is stored.
+	// [sec] The plaintext token is returned only in this response.
 	w.Header().Set("Cache-Control", "no-store")
 	respondJSON(w, http.StatusCreated, createAPIKeyResponse{APIKey: toAPIKeyResponse(key), Token: token})
 }
