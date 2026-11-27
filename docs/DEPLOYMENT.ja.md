@@ -16,6 +16,7 @@ Personal Access Token は不要になりました。
     - **Application name**: 例 `dora-yaki (production)`
     - **Homepage URL**: フロントエンドの origin、例 `https://dora-yaki.example.com`
     - **Authorization callback URL**: `https://<backend-domain>/api/auth/github/callback`
+      (Cloudflare Pages の場合はフロントエンドのドメイン `https://<frontend-domain>/api/auth/github/callback`)
 3. **Register application** をクリック
 4. **Client ID** をコピーし、**Generate a new client secret** で Client Secret を発行する
 5. (推奨) OAuth App 設定の **Expire user authorization tokens** を有効にして refresh token が発行されるようにする
@@ -125,7 +126,7 @@ gcloud secrets versions add JOB_AUTH_KEY              --data-file=- <<<"$JOB_KEY
 | `ENCRYPTION_KEY_BASE64` | Secret Manager | KMS 利用時は省略 |
 | `JOB_AUTH_KEY` | Secret Manager | 本番必須。`/api/job/*` 用の共有キー |
 | `ENCRYPTION_KMS_KEY` | env (平文) | KMS リソースパス。base64 利用時は省略 |
-| `OAUTH_REDIRECT_URL` | env (平文) | `https://<backend-domain>/api/auth/github/callback` |
+| `OAUTH_REDIRECT_URL` | env (平文) | `https://<backend-domain>/api/auth/github/callback` (Cloudflare Pages の場合は `https://<frontend-domain>/...`) |
 | `FRONTEND_URL` | env (平文) | フロントエンドの origin (ログイン後のリダイレクト先) |
 | `AUTH_COOKIE_DOMAIN` | env (平文) | 任意。フロントエンドとバックエンドが同一ドメインのサブドメイン構成のときに設定 |
 | `GCP_PROJECT_ID` | env (平文) | |
@@ -172,6 +173,19 @@ state backend を適切に保護してください。
 バックエンドの絶対 URL を設定してください。
 frontend の deploy ターゲットもデプロイ前に解決済みの変数を表示し、`Continue? [y/N]` で確認します。
 
+### Cloudflare Pages
+
+`make deploy-cloudflare` は `VITE_API_BASE=/api` で SPA をビルドし、`/api/*` をバックエンドへ中継する
+Pages Function `frontend/functions/api/[[path]].ts` を一緒にデプロイします。ブラウザからは同一 origin になるため、
+セッションクッキーはファーストパーティになります。SPA から `cloudfunctions.net` を直接呼ぶ構成では、
+サードパーティクッキーをブロックするブラウザ (Safari と iOS の全ブラウザ) でログイン状態を保持できません。
+
+- 中継先は Pages プロジェクトの secret `API_BACKEND` です。Makefile がデプロイのたびに
+  `https://<region>-<project>.cloudfunctions.net/<function>` を設定します
+- OAuth の callback はフロントエンドのドメインに向けます。`BACKEND_OAUTH_REDIRECT_URL` を
+  `https://<frontend-domain>/api/auth/github/callback` にしてバックエンドを再デプロイし、
+  GitHub OAuth App の **Authorization callback URL** も同じ値に変更してください
+
 ## Cloud Scheduler
 
 `backend_service_url` と `scheduler_auth_key` を設定すると Terraform で 2 つのジョブが作成されます:
@@ -204,7 +218,7 @@ GitHub OAuth によるユーザー認証が組み込まれました。`/api/auth
 ログインユーザーは `/api-keys` 画面から、CI・BI・bot 向けの個人用 API キー (`dyk_...`) を発行できます。
 
 - キーは**読み取り専用**です。受け付けるのはデータ取得の `GET` ルートのみで、書き込み系ルート・`/api/github/*`・`/api/api-keys` は引き続きセッションが必要です (API キーでは 401)。
-- バックエンドは `--allow-unauthenticated` でデプロイされているため、外部ツールはバックエンド URL (`VITE_API_BASE`、つまり `cloudfunctions.net` のエンドポイント) を直接呼び出します。将来バックエンドを IAM・Cloudflare Access・Cloud Armor のルールで閉じる場合は、API キーのクライアントも通れるようにする必要があります。
+- バックエンドは `--allow-unauthenticated` でデプロイされているため、外部ツールはバックエンド URL (`cloudfunctions.net` のエンドポイント) を直接呼び出します。将来バックエンドを IAM・Cloudflare Access・Cloud Armor のルールで閉じる場合は、API キーのクライアントも通れるようにする必要があります。
 - `APIKey` Kind に保存するのはシークレットの SHA-256 ハッシュのみで、平文は発行時に 1 回だけ表示されます。有効期限は最大 365 日で、所有者の GitHub トークンが存在しない・無効化済みの場合は使えなくなります。
 - キーが漏洩した場合は `/api-keys` から失効してください。失効は即時に反映されます。プレフィックス `dyk_` によりシークレットスキャナで検出しやすくしています。
 - 新しい環境変数・Secret・Terraform リソース・Datastore 複合インデックスの追加は不要です。

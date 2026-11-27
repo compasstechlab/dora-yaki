@@ -16,6 +16,7 @@ shared GitHub Personal Access Token.
     - **Application name**: e.g. `dora-yaki (production)`
     - **Homepage URL**: the frontend origin, e.g. `https://dora-yaki.example.com`
     - **Authorization callback URL**: `https://<backend-domain>/api/auth/github/callback`
+      (Cloudflare Pages: use the frontend domain, `https://<frontend-domain>/api/auth/github/callback`)
 3. Click **Register application**.
 4. Copy the **Client ID** and click **Generate a new client secret**.
 5. (Recommended) In the OAuth App settings, enable **Expire user authorization tokens** so refresh tokens are issued.
@@ -124,7 +125,7 @@ Configure the runtime environment variables on the function (or Cloud Run servic
 | `ENCRYPTION_KEY_BASE64` | Secret Manager | omit when using KMS |
 | `JOB_AUTH_KEY` | Secret Manager | Required in production. Shared key for `/api/job/*` endpoints |
 | `ENCRYPTION_KMS_KEY` | env (plain) | KMS resource path; omit when using base64 |
-| `OAUTH_REDIRECT_URL` | env (plain) | `https://<backend-domain>/api/auth/github/callback` |
+| `OAUTH_REDIRECT_URL` | env (plain) | `https://<backend-domain>/api/auth/github/callback` (Cloudflare Pages: `https://<frontend-domain>/...`) |
 | `FRONTEND_URL` | env (plain) | Frontend origin (used for post-login redirect) |
 | `AUTH_COOKIE_DOMAIN` | env (plain) | Optional; set when frontend & backend are on different subdomains of the same root |
 | `GCP_PROJECT_ID` | env (plain) | |
@@ -177,6 +178,19 @@ when needed.
 Frontend deploy targets also print the resolved variables and ask for
 confirmation with `Continue? [y/N]`.
 
+### Cloudflare Pages
+
+`make deploy-cloudflare` builds the SPA with `VITE_API_BASE=/api` and deploys the Pages Function
+`frontend/functions/api/[[path]].ts`, which proxies `/api/*` to the backend. The browser then talks to a
+single origin, so the session cookie is first-party. Browsers that block third-party cookies (Safari and
+every iOS browser) cannot keep the session when the SPA calls `cloudfunctions.net` directly.
+
+- The proxy target is the Pages project secret `API_BACKEND`. The Makefile sets it to
+  `https://<region>-<project>.cloudfunctions.net/<function>` before each deploy.
+- Point the OAuth callback at the frontend domain: set `BACKEND_OAUTH_REDIRECT_URL` to
+  `https://<frontend-domain>/api/auth/github/callback`, redeploy the backend, and update the
+  **Authorization callback URL** of the GitHub OAuth App to the same value.
+
 ## Cloud Scheduler
 
 Two jobs are managed by Terraform once `backend_service_url` and
@@ -210,7 +224,7 @@ Additional production hardening you should still consider:
 Logged-in users can issue personal API keys (`dyk_...`) from the `/api-keys` page for CI, BI or bots.
 
 - Keys are **read-only**: accepted on `GET` data routes only. Write routes, `/api/github/*` and `/api/api-keys` still require a session (401 otherwise).
-- External tools call the backend URL directly (`VITE_API_BASE`, i.e. the `cloudfunctions.net` endpoint), because the backend is deployed with `--allow-unauthenticated`. If you later put the backend behind IAM, Cloudflare Access or Cloud Armor rules, API key clients must be allowed through as well.
+- External tools call the backend URL directly (the `cloudfunctions.net` endpoint), because the backend is deployed with `--allow-unauthenticated`. If you later put the backend behind IAM, Cloudflare Access or Cloud Armor rules, API key clients must be allowed through as well.
 - Only the SHA-256 hash of the secret is stored in the `APIKey` kind; the plaintext is shown once at creation. Keys expire after at most 365 days and stop working when the owner's GitHub token is missing or marked invalid.
 - If a key leaks, revoke it from `/api-keys`; revocation takes effect immediately. The `dyk_` prefix makes keys easy to catch with secret scanners.
 - No new environment variables, secrets, Terraform resources or Datastore composite indexes are required.

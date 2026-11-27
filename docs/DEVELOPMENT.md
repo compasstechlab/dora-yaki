@@ -342,6 +342,8 @@ dora-yaki/
 │   │   │   ├── stores/          # Svelte stores
 │   │   │   └── utils/           # Utility functions
 │   │   └── routes/              # SvelteKit pages
+│   ├── functions/               # Cloudflare Pages Functions (/api/* proxy)
+│   ├── tests/                   # node --test (pnpm test)
 │   ├── Dockerfile
 │   └── package.json
 ├── terraform/                   # Infrastructure as Code

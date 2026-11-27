@@ -22,15 +22,19 @@ build:
 	pnpm run build
 
 # deploy vars
-_api_base = $(if $(deploy_vite_api_base),$(deploy_vite_api_base),https://$(region)-$(project).cloudfunctions.net/$(backend_function_name)/api)
+_backend_url = https://$(region)-$(project).cloudfunctions.net/$(backend_function_name)
+_api_base = $(if $(deploy_vite_api_base),$(deploy_vite_api_base),$(_backend_url)/api)
+# Cloudflare Pages proxies /api/* to the backend (functions/api/[[path]].ts), keeping the session cookie first-party.
+_cloudflare_api_base = $(if $(deploy_vite_api_base),$(deploy_vite_api_base),/api)
 _image = ${region}-docker.pkg.dev/${project}/$(frontend_image_repository)/$(frontend_service_name)
 _subs = _IMAGE=$(_image),_VITE_API_BASE=$(_api_base),_VITE_DEFAULT_LOCALE=${lang}
 
 deploy-cloudflare:
 	$(MAKE) __validate-cloudflare
 	$(MAKE) __confirm-cloudflare
-	printf 'VITE_API_BASE=$(_api_base)\nVITE_DEFAULT_LOCALE=${lang}\n' > .env.production
-	$(MAKE) __build-static
+	printf 'VITE_API_BASE=$(_cloudflare_api_base)\nVITE_DEFAULT_LOCALE=${lang}\n' > .env.production
+	$(MAKE) __build-static build_api_base=$(_cloudflare_api_base)
+	printf '%s' '$(_backend_url)' | wrangler pages secret put API_BACKEND --project-name $(cloudflare_project_name)
 	wrangler pages deploy build-static --project-name $(cloudflare_project_name)
 
 deploy-firebase:
@@ -42,7 +46,7 @@ deploy-firebase:
 __build-static:
 	cp svelte.config.js svelte.config.js.bak
 	cp svelte.config.static.js svelte.config.js
-	VITE_API_BASE="$(_api_base)" VITE_DEFAULT_LOCALE="${lang}" VITE_SPA_MODE=true pnpm run build || (mv svelte.config.js.bak svelte.config.js && exit 1)
+	VITE_API_BASE="$(or $(build_api_base),$(_api_base))" VITE_DEFAULT_LOCALE="${lang}" VITE_SPA_MODE=true pnpm run build || (mv svelte.config.js.bak svelte.config.js && exit 1)
 	mv svelte.config.js.bak svelte.config.js
 	echo "/* /index.html 200" > build-static/_redirects
 
@@ -91,7 +95,8 @@ __confirm-cloudflare:
 	@echo "  GCP_REGION=$(region)"
 	@echo "  BACKEND_FUNCTION_NAME=$(backend_function_name)"
 	@echo "  VITE_DEFAULT_LOCALE=$(lang)"
-	@echo "  VITE_API_BASE=$(_api_base)"
+	@echo "  VITE_API_BASE=$(_cloudflare_api_base)"
+	@echo "  API_BACKEND=$(_backend_url) (Pages Functions proxy target)"
 	@echo "  FRONTEND_CLOUDFLARE_PROJECT_NAME=$(cloudflare_project_name)"
 	@$(MAKE) __confirm-common
 
