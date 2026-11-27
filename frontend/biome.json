@@ -39,6 +39,8 @@
   "files": {
     "includes": [
       "src/**",
+      "functions/**",
+      "tests/**",
       "*.ts",
       "*.js"
     ]
