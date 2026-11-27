@@ -12,6 +12,16 @@ let { children }: { children: Snippet } = $props();
 
 let currentPath = $state('/');
 let isLoginRoute = $state(false);
+// isMenuOpen : whether the sidebar drawer is open on mobile widths.
+let isMenuOpen = $state(false);
+
+function closeMenu() {
+	isMenuOpen = false;
+}
+
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === 'Escape') closeMenu();
+}
 
 onMount(async () => {
 	currentPath = window.location.pathname;
@@ -80,6 +90,8 @@ function handleLocaleChange(e: Event) {
 }
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
+
 <FlashMessage />
 
 {#if isLoginRoute}
@@ -90,7 +102,32 @@ function handleLocaleChange(e: Event) {
 	<div class="loading">Redirecting…</div>
 {:else}
 	<div class="layout">
-		<aside class="sidebar">
+		<header class="mobile-header">
+			<button
+				type="button"
+				class="menu-toggle"
+				aria-label={$t('nav.menu')}
+				aria-expanded={isMenuOpen}
+				aria-controls="app-sidebar"
+				onclick={() => (isMenuOpen = !isMenuOpen)}
+			>
+				<span class="menu-icon" aria-hidden="true"></span>
+			</button>
+			<span class="logo-icon">📊</span>
+			<span class="logo-text">DORA-yaki</span>
+		</header>
+
+		{#if isMenuOpen}
+			<button
+				type="button"
+				class="sidebar-backdrop"
+				aria-hidden="true"
+				tabindex="-1"
+				onclick={closeMenu}
+			></button>
+		{/if}
+
+		<aside id="app-sidebar" class="sidebar" class:open={isMenuOpen}>
 			<div class="logo">
 				<span class="logo-icon">📊</span>
 				<span class="logo-text">DORA-yaki</span>
@@ -104,7 +141,10 @@ function handleLocaleChange(e: Event) {
             ? currentPath === "/"
             : currentPath === item.path ||
               currentPath.startsWith(item.path + "/")}
-					onclick={() => (currentPath = item.path)}
+					onclick={() => {
+						currentPath = item.path;
+						closeMenu();
+					}}
 				>
 					<span class="nav-icon">{item.icon}</span>
 					<span class="nav-label">{item.label}</span>
@@ -447,15 +487,127 @@ function handleLocaleChange(e: Event) {
 	color: var(--color-text-muted, #9ca3af);
 }
 
+.mobile-header,
+.sidebar-backdrop {
+	display: none;
+}
+
+/* Mobile: the sidebar becomes a drawer opened from the top bar */
 @media (max-width: 768px) {
-	.sidebar {
-		width: 100%;
-		height: auto;
+	.layout {
+		display: block;
+	}
+
+	.mobile-header {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		position: sticky;
+		top: 0;
+		z-index: 90;
+		height: 56px;
+		padding: 0 0.5rem;
+		background: var(--color-bg-sidebar);
+		color: white;
+	}
+
+	.mobile-header .logo-text {
+		font-size: 1.125rem;
+	}
+
+	.menu-toggle {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 44px;
+		height: 44px;
+		background: transparent;
+		border: none;
+		border-radius: var(--radius-md);
+		color: white;
+		cursor: pointer;
+	}
+
+	.menu-toggle:hover {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.menu-toggle:focus-visible {
+		outline: 2px solid var(--color-primary);
+		outline-offset: -2px;
+	}
+
+	/* Hamburger icon (three bars) */
+	.menu-icon,
+	.menu-icon::before,
+	.menu-icon::after {
+		display: block;
+		width: 20px;
+		height: 2px;
+		background: currentColor;
+		border-radius: 1px;
+	}
+
+	.menu-icon {
 		position: relative;
+	}
+
+	.menu-icon::before,
+	.menu-icon::after {
+		content: "";
+		position: absolute;
+		left: 0;
+	}
+
+	.menu-icon::before {
+		top: -6px;
+	}
+
+	.menu-icon::after {
+		top: 6px;
+	}
+
+	.sidebar-backdrop {
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: 99;
+		background: rgb(0 0 0 / 0.4);
+		border: none;
+		cursor: pointer;
+	}
+
+	.sidebar {
+		width: min(280px, 85vw);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		transform: translateX(-100%);
+		visibility: hidden;
+		transition:
+			transform 0.2s ease-out,
+			visibility 0.2s;
+	}
+
+	.sidebar.open {
+		transform: none;
+		visibility: visible;
+	}
+
+	.sidebar-footer {
+		max-height: none;
+		overflow-y: visible;
 	}
 
 	.main {
 		margin-left: 0;
+		padding: 1rem;
+		min-height: auto;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sidebar {
+		transition: none;
 	}
 }
 </style>

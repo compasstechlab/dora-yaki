@@ -245,6 +245,10 @@ async function loadSummaries() {
 }
 
 @media (max-width: 768px) {
+	.page-header h1 {
+		font-size: 1.5rem;
+	}
+
 	.repo-grid {
 		grid-template-columns: 1fr;
 	}
