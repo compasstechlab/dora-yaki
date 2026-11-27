@@ -873,4 +873,15 @@ function stateClass(state: string): string {
 		grid-template-columns: 1fr;
 	}
 }
+
+@media (max-width: 768px) {
+	.page-header h1 {
+		font-size: 1.5rem;
+		overflow-wrap: anywhere;
+	}
+
+	.score-overview {
+		padding: 1rem;
+	}
+}
 </style>

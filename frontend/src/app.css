@@ -186,3 +186,27 @@ h4 {
 		grid-template-columns: 1fr;
 	}
 }
+
+/* Mobile: wrap header rows and scroll tables horizontally inside cards */
+@media (max-width: 768px) {
+	h1 {
+		font-size: 1.5rem;
+	}
+
+	.page-header,
+	.section-header {
+		flex-wrap: wrap;
+	}
+
+	.card {
+		padding: 1rem;
+	}
+
+	.card:has(> table) {
+		overflow-x: auto;
+	}
+
+	.card > table th {
+		white-space: nowrap;
+	}
+}

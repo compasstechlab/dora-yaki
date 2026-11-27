@@ -535,4 +535,14 @@ async function handleRefresh() {
 		grid-template-columns: repeat(2, 1fr);
 	}
 }
+
+@media (max-width: 768px) {
+	.page-header h1 {
+		font-size: 1.5rem;
+	}
+
+	.score-overview {
+		padding: 1rem;
+	}
+}
 </style>

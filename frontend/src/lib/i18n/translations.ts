@@ -49,6 +49,7 @@ const ja: TranslationDict = {
 		bots: 'ボット',
 		apiKeys: 'APIキー',
 		repositories: 'リポジトリ管理',
+		menu: 'メニュー',
 	},
 	dashboard: {
 		title: '開発生産性ダッシュボード',
@@ -460,6 +461,7 @@ const en: TranslationDict = {
 		bots: 'Bots',
 		apiKeys: 'API Keys',
 		repositories: 'Repo Management',
+		menu: 'Menu',
 	},
 	dashboard: {
 		title: 'Development Productivity Dashboard',
@@ -870,6 +872,7 @@ const zhTW: TranslationDict = {
 		bots: '機器人',
 		apiKeys: 'API 金鑰',
 		repositories: '儲存庫管理',
+		menu: '選單',
 	},
 	dashboard: {
 		title: '開發生產力儀表板',
@@ -1275,6 +1278,7 @@ const zhCN: TranslationDict = {
 		bots: '机器人',
 		apiKeys: 'API 密钥',
 		repositories: '仓库管理',
+		menu: '菜单',
 	},
 	dashboard: {
 		title: '开发生产力仪表盘',
@@ -1680,6 +1684,7 @@ const ko: TranslationDict = {
 		bots: '봇',
 		apiKeys: 'API 키',
 		repositories: '저장소 관리',
+		menu: '메뉴',
 	},
 	dashboard: {
 		title: '개발 생산성 대시보드',
@@ -2088,6 +2093,7 @@ const es: TranslationDict = {
 		bots: 'Bots',
 		apiKeys: 'Claves API',
 		repositories: 'Gestión de repos',
+		menu: 'Menú',
 	},
 	dashboard: {
 		title: 'Panel de Productividad',
@@ -2498,6 +2504,7 @@ const fr: TranslationDict = {
 		bots: 'Bots',
 		apiKeys: 'Clés API',
 		repositories: 'Gestion des dépôts',
+		menu: 'Menu',
 	},
 	dashboard: {
 		title: 'Tableau de bord de productivité',
@@ -2908,6 +2915,7 @@ const de: TranslationDict = {
 		bots: 'Bots',
 		apiKeys: 'API-Schlüssel',
 		repositories: 'Repo-Verwaltung',
+		menu: 'Menü',
 	},
 	dashboard: {
 		title: 'Entwicklungsproduktivitäts-Dashboard',
